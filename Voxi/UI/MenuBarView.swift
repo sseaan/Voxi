@@ -28,6 +28,9 @@ struct MenuBarView: View {
             if !appState.interimText.isEmpty {
                 interimPreview
             }
+            if let result = appState.lastResult {
+                resultPreview(result)
+            }
 
             Divider()
             controls
@@ -105,6 +108,38 @@ struct MenuBarView: View {
             pasteboard.clearContents()
             pasteboard.setString(text, forType: .string)
         }
+    }
+
+    private func resultPreview(_ result: TranscriptionResult) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("识别结果")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("复制") {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(result.text, forType: .string)
+                }
+                .buttonStyle(.link)
+                .font(.caption)
+            }
+            Text(result.text)
+                .font(.callout)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(6)
+            if let logID = result.logID {
+                Text("LogID: \(logID)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var interimPreview: some View {

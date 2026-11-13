@@ -209,6 +209,11 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
 
     // MARK: - 校验
 
+    /// Voxi 统一写入的 multipart 字段，自定义字段不得重复。
+    static let reservedFormFieldNames: Set<String> = [
+        "file", "model", "language", "prompt", "response_format", "boundary"
+    ]
+
     /// 端点是否指向本机 loopback。
     var isLoopbackEndpoint: Bool {
         guard let host = URLComponents(string: endpointURL)?.host?.lowercased() else { return false }
@@ -258,16 +263,32 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
             if openAI.timeoutSeconds <= 0 {
                 errors.append(.invalidTimeout)
             }
-            for name in openAI.customHeaders.map(\.name) where name
-                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let customHeaderNames = openAI.customHeaders
+                .map { $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            if customHeaderNames.contains(where: \.isEmpty) {
                 errors.append(.emptyCustomFieldName)
             }
-            if openAI.customHeaders.contains(where: { $0.name.lowercased() == "content-type" }) {
+            if customHeaderNames.contains("content-type") {
                 errors.append(.reservedHeader("content-type"))
             }
-            for name in openAI.customFormFields.map(\.name)
-            where name == "file" || name == "boundary" || name == "model" {
-                errors.append(.reservedFormField(name))
+            if customHeaderNames.contains("authorization") {
+                errors.append(.reservedHeader("authorization"))
+            }
+            if openAI.authMode == .customHeader {
+                let authHeaderName = openAI.customAuthHeaderName
+                    .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !authHeaderName.isEmpty, customHeaderNames.contains(authHeaderName) {
+                    errors.append(.reservedHeader(authHeaderName))
+                }
+            }
+            for field in openAI.customFormFields
+            where Self.reservedFormFieldNames.contains(field.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) {
+                errors.append(.reservedFormField(field.name))
+            }
+            if openAI.customFormFields.contains(where: {
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }) {
+                errors.append(.emptyCustomFieldName)
             }
 
         case .volcengineStreaming:

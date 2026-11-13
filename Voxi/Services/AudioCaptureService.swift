@@ -7,6 +7,7 @@ enum AudioCaptureError: Error, LocalizedError, Equatable {
     case noInputDevice
     case converterCreationFailed
     case engineStartFailed(String)
+    case engineStartTimedOut
     case fileWriteFailed(String)
     case emptyRecording
 
@@ -17,6 +18,7 @@ enum AudioCaptureError: Error, LocalizedError, Equatable {
         case .noInputDevice: return "没有可用的麦克风输入设备，请检查系统声音设置。"
         case .converterCreationFailed: return "无法创建音频格式转换器（16 kHz / 单声道 / PCM16）。"
         case let .engineStartFailed(message): return "无法启动录音引擎：\(message)"
+        case .engineStartTimedOut: return "麦克风启动超时。请检查系统声音输入设备是否可用后重试。"
         case let .fileWriteFailed(message): return "写入临时录音文件失败：\(message)"
         case .emptyRecording: return "没有采集到音频数据。"
         }
@@ -148,7 +150,8 @@ struct PCMChunker {
 }
 
 /// 录音采集接口，便于协调器注入假实现做状态机测试。
-protocol AudioCapturing: AnyObject {
+/// 实现必须可跨线程使用（引擎启动会在后台执行，避免阻塞主线程）。
+protocol AudioCapturing: AnyObject, Sendable {
     /// 开始采集并返回 PCM 分片流；调用方必须持续消费。
     func start() throws -> AsyncStream<Data>
     /// 结束采集并返回录音元数据。
@@ -161,7 +164,7 @@ protocol AudioCapturing: AnyObject {
 ///
 /// 线程模型：tap 在音频线程上回调，转换/写文件/分片都在该线程内完成；
 /// `finish`/`cancel` 在主线程调用，用锁串行化。所有网络与 UI 工作都在外部进行。
-final class AudioCaptureService: AudioCapturing {
+final class AudioCaptureService: AudioCapturing, @unchecked Sendable {
     static let chunkByteCount = 6_400
 
     /// 开发诊断：设置 `VOXI_KEEP_RECORDINGS=1` 时保留临时 WAV 并打印路径。

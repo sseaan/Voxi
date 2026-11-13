@@ -83,7 +83,7 @@ struct VoxiSettings: Codable, Equatable {
 /// UserDefaults 持久化。敏感值走 `KeychainService`，这里只存 item 引用。
 @MainActor
 final class SettingsStore: ObservableObject {
-    static let storageKey = "com.voxi.settings"
+    nonisolated static let storageKey = "com.voxi.settings"
 
     private let defaults: UserDefaults
     private let storageKey: String
@@ -129,7 +129,7 @@ final class SettingsStore: ObservableObject {
 
     // MARK: - 读写
 
-    static func load(from defaults: UserDefaults, storageKey: String = storageKey) -> VoxiSettings {
+    nonisolated static func load(from defaults: UserDefaults, storageKey: String = storageKey) -> VoxiSettings {
         guard let data = defaults.data(forKey: storageKey) else {
             return VoxiSettings()
         }
