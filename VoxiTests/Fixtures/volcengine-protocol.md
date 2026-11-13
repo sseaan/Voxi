@@ -101,6 +101,21 @@ Flags：
 - `result_type=single`：增量返回；只拼接新出现的 `definite` 分句。
 - `definite=true` 只代表分句稳定，不代表会话结束。
 
+## 序号（实测补充）
+
+服务端按 `autoAssignedSequence` 校验每个请求包的序号，必须连续：
+
+- `full client request` 使用**正序号 1**（flags = 0x1，帧内带 4 字节 sequence）。
+- 之后每个 `audio only request` 依次使用 2、3、4…。
+- 若初始化帧不带序号、音频从 1 开始，服务端返回：
+
+```
+45000000 decode ws request failed: unable to decode V1 protocol message:
+autoAssignedSequence (2) mismatch sequence in request (1)
+```
+
+- 最后一包实测使用 flags = 0x2（无序号）可以正常收到最终结果。
+
 ## 音频包
 
 - 16 kHz / 16-bit signed little-endian / mono PCM。

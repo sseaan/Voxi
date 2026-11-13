@@ -175,7 +175,8 @@ final class VolcengineStreamingSession: TranscriptionSession {
     private var finalContinuation: CheckedContinuation<TranscriptionResult, Error>?
 
     private var pendingChunk: Data?
-    private var audioSequence: Int32 = 0
+    // 序号 1 已被 full client request 占用，音频从 2 开始。
+    private var audioSequence: Int32 = 1
     private var finalResult: TranscriptionResult?
     private var failure: Error?
     private var isReady = false
@@ -249,6 +250,8 @@ final class VolcengineStreamingSession: TranscriptionSession {
         guard !isFinished else { throw TranscriptionError.cancelled }
         isFinished = true
 
+        if let failure { throw failure }
+
         let lastChunk = pendingChunk ?? Data()
         pendingChunk = nil
         do {
@@ -256,7 +259,8 @@ final class VolcengineStreamingSession: TranscriptionSession {
         } catch {
             let mapped = Self.mapTransportError(error)
             fail(mapped)
-            throw mapped
+            // 如果接收循环已经拿到服务端错误，优先上报它。
+            throw failure ?? mapped
         }
 
         return try await waitForFinalResult()

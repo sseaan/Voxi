@@ -1,28 +1,36 @@
+import AppKit
 import SwiftUI
 
 @main
-struct VoxiApp: App {
-    @StateObject private var settingsStore: SettingsStore
-    @StateObject private var appState: AppState
-    @StateObject private var coordinator: AppCoordinator
+struct VoxiApp {
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = AppDelegate()
+        application.delegate = delegate
+        application.setActivationPolicy(.accessory)
+        application.run()
+    }
+}
 
-    init() {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var settingsStore: SettingsStore!
+    private var appState: AppState!
+    private var coordinator: AppCoordinator!
+    private var statusItem: StatusItemController!
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = SettingsStore()
         let state = AppState()
-        _settingsStore = StateObject(wrappedValue: settings)
-        _appState = StateObject(wrappedValue: state)
         let coordinator = AppCoordinator(settings: settings, appState: state)
-        _coordinator = StateObject(wrappedValue: coordinator)
+        self.settingsStore = settings
+        self.appState = state
+        self.coordinator = coordinator
+        self.statusItem = StatusItemController(settings: settings, appState: state, coordinator: coordinator)
         coordinator.activate()
     }
 
-    var body: some Scene {
-        MenuBarExtra {
-            MenuBarView(settings: settingsStore, appState: appState, coordinator: coordinator)
-        } label: {
-            Image(systemName: appState.state.menuBarSystemImage)
-                .accessibilityLabel("Voxi：\(appState.state.menuTitle)")
-        }
-        .menuBarExtraStyle(.window)
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 }

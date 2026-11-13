@@ -73,14 +73,17 @@ struct VolcengineServerFrame: Equatable {
 }
 
 enum VolcengineFrameEncoder {
-    /// full client request：JSON + gzip，无 sequence（官方示例 flags = 0x0）。
-    static func fullClientRequest(json: Data) throws -> Data {
+    /// full client request：JSON + gzip，使用正序号 1。
+    ///
+    /// 服务端按 `autoAssignedSequence` 校验：初始化帧占序号 1，后续音频包必须从 2 开始，
+    /// 否则返回 `45000000 ... mismatch sequence in request`。
+    static func fullClientRequest(json: Data, sequence: Int32 = 1) throws -> Data {
         try makeFrame(
             messageType: .fullClientRequest,
-            flags: .noSequence,
+            flags: .positiveSequence,
             serialization: 0x1,
             compression: 0x1,
-            sequence: nil,
+            sequence: sequence,
             payload: try Gzip.compress(json)
         )
     }

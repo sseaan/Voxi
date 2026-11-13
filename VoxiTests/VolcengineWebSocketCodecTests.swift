@@ -82,13 +82,15 @@ final class VolcengineFrameEncoderTests: XCTestCase {
         let bytes = [UInt8](frame)
 
         XCTAssertEqual(bytes[0], 0x11, "version 1 + header size 4")
-        XCTAssertEqual(bytes[1], 0x10, "full client request + no sequence")
+        XCTAssertEqual(bytes[1], 0x11, "full client request + positive sequence")
         XCTAssertEqual(bytes[2], 0x11, "JSON + gzip")
         XCTAssertEqual(bytes[3], 0x00)
 
-        let payloadSize = Int(UInt32(bytes[4]) << 24 | UInt32(bytes[5]) << 16 | UInt32(bytes[6]) << 8 | UInt32(bytes[7]))
-        XCTAssertEqual(payloadSize, frame.count - 8)
-        XCTAssertEqual(try Gzip.decompress(frame.subdata(in: 8..<frame.count)), json)
+        let sequence = Int32(bitPattern: UInt32(bytes[4]) << 24 | UInt32(bytes[5]) << 16 | UInt32(bytes[6]) << 8 | UInt32(bytes[7]))
+        XCTAssertEqual(sequence, 1, "初始化帧占用序号 1")
+        let payloadSize = Int(UInt32(bytes[8]) << 24 | UInt32(bytes[9]) << 16 | UInt32(bytes[10]) << 8 | UInt32(bytes[11]))
+        XCTAssertEqual(payloadSize, frame.count - 12)
+        XCTAssertEqual(try Gzip.decompress(frame.subdata(in: 12..<frame.count)), json)
     }
 
     func testAudioFrameWithPositiveSequence() throws {

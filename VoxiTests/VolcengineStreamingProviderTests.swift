@@ -185,7 +185,7 @@ final class VolcengineStreamingProviderTests: XCTestCase {
 
         let frame = try XCTUnwrap(transport.sentFrames.first)
         let bytes = [UInt8](frame)
-        XCTAssertEqual(bytes[1], 0x10, "full client request")
+        XCTAssertEqual(bytes[1], 0x11, "full client request + positive sequence")
         XCTAssertEqual(bytes[2], 0x11, "JSON + gzip")
         let decoded = try VolcengineFrameDecoder.decode(frame)
         let json = try XCTUnwrap(
