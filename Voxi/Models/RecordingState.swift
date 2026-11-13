@@ -57,7 +57,8 @@ enum RecordingState: String, Codable, CaseIterable, Equatable {
         case .recording:
             return [.finalizingAudio, .cancelling, .failed]
         case .finalizingAudio:
-            return [.transcribing, .cancelling, .failed]
+            // 直接回 idle：音频为空或没有可发送的内容，无需请求服务。
+            return [.transcribing, .idle, .cancelling, .failed]
         case .transcribing:
             return [.inserting, .idle, .cancelling, .failed]
         case .inserting:

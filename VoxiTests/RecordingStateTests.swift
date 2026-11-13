@@ -49,6 +49,10 @@ final class RecordingStateTests: XCTestCase {
         }
     }
 
+    func testEmptyAudioCanReturnToIdleWithoutTranscribing() {
+        XCTAssertTrue(RecordingState.finalizingAudio.canTransition(to: .idle))
+    }
+
     func testBusyFlag() {
         XCTAssertFalse(RecordingState.idle.isBusy)
         XCTAssertFalse(RecordingState.failed.isBusy)
