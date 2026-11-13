@@ -1,0 +1,485 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		001C89F6AE536D0DA770C6A5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C9E45456AA639B9D729E82 /* Logger.swift */; };
+		149277C3EFA76F001653D154 /* EndpointProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */; };
+		33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */; };
+		6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */; };
+		7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C819C7D57E572C842CA2968 /* RecordingMode.swift */; };
+		817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C915665C4131D29A46F25A /* RecordingState.swift */; };
+		849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */; };
+		9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */; };
+		CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */; };
+		D12E704904C109F8F6B916C7 /* VoxiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352DDCDC5F3833C9EC3D4D1A /* VoxiApp.swift */; };
+		D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */; };
+		ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CA3F36E3B96C0524780F4F /* SettingsStore.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		19FEB8D8D24DEFFAEC8EFFE2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = FD20BD7979811F60ED19F90F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AFE9741FEA0C50FA759585D5;
+			remoteInfo = Voxi;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
+		1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionResult.swift; sourceTree = "<group>"; };
+		2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConfiguration.swift; sourceTree = "<group>"; };
+		25CA3F36E3B96C0524780F4F /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
+		352DDCDC5F3833C9EC3D4D1A /* VoxiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiApp.swift; sourceTree = "<group>"; };
+		44C6CA7CCA4CB89F340C5351 /* VoxiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoxiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextMode.swift; sourceTree = "<group>"; };
+		57C9E45456AA639B9D729E82 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiTests.swift; sourceTree = "<group>"; };
+		6C819C7D57E572C842CA2968 /* RecordingMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingMode.swift; sourceTree = "<group>"; };
+		7FC5595E22A9F7D5F2997552 /* Voxi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voxi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointProfile.swift; sourceTree = "<group>"; };
+		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
+		EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStateTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		10889C1692D1193DB80FD076 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */,
+				6C819C7D57E572C842CA2968 /* RecordingMode.swift */,
+				D4C915665C4131D29A46F25A /* RecordingState.swift */,
+				2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */,
+				4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */,
+				1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		1B28536F7CC88DAED96C08C8 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				25CA3F36E3B96C0524780F4F /* SettingsStore.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		462E4FCB174E484C33B32915 = {
+			isa = PBXGroup;
+			children = (
+				597909543967B3559C846638 /* Voxi */,
+				E5D9E99D8717028F119D7E9C /* VoxiTests */,
+				65944179C3DFD381F4C8244A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		597909543967B3559C846638 /* Voxi */ = {
+			isa = PBXGroup;
+			children = (
+				F5C0189EBD2C3645A8C86A77 /* App */,
+				10889C1692D1193DB80FD076 /* Models */,
+				1B28536F7CC88DAED96C08C8 /* Services */,
+				D80B928CBEEEC48E5420C5FE /* Support */,
+			);
+			path = Voxi;
+			sourceTree = "<group>";
+		};
+		65944179C3DFD381F4C8244A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				7FC5595E22A9F7D5F2997552 /* Voxi.app */,
+				44C6CA7CCA4CB89F340C5351 /* VoxiTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D80B928CBEEEC48E5420C5FE /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				57C9E45456AA639B9D729E82 /* Logger.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		E5D9E99D8717028F119D7E9C /* VoxiTests */ = {
+			isa = PBXGroup;
+			children = (
+				EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */,
+				15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */,
+				5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */,
+			);
+			path = VoxiTests;
+			sourceTree = "<group>";
+		};
+		F5C0189EBD2C3645A8C86A77 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				352DDCDC5F3833C9EC3D4D1A /* VoxiApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1EBFABD5F43D07DF4577431C /* VoxiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E70FC897206BB3F2C4C36A9D /* Build configuration list for PBXNativeTarget "VoxiTests" */;
+			buildPhases = (
+				AB398E03C9094AE204FE7941 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				317D5C862622CC4E2C769CEF /* PBXTargetDependency */,
+			);
+			name = VoxiTests;
+			packageProductDependencies = (
+			);
+			productName = VoxiTests;
+			productReference = 44C6CA7CCA4CB89F340C5351 /* VoxiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		AFE9741FEA0C50FA759585D5 /* Voxi */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1B189510BA8A6582881CD1D /* Build configuration list for PBXNativeTarget "Voxi" */;
+			buildPhases = (
+				616BD8DCA648B4CDCE4FC3DD /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Voxi;
+			packageProductDependencies = (
+			);
+			productName = Voxi;
+			productReference = 7FC5595E22A9F7D5F2997552 /* Voxi.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FD20BD7979811F60ED19F90F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2720;
+				TargetAttributes = {
+					1EBFABD5F43D07DF4577431C = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+					AFE9741FEA0C50FA759585D5 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Manual;
+					};
+				};
+			};
+			buildConfigurationList = 8D52D25F6A895FFD46303B80 /* Build configuration list for PBXProject "Voxi" */;
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				"zh-Hans",
+			);
+			mainGroup = 462E4FCB174E484C33B32915;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 65944179C3DFD381F4C8244A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AFE9741FEA0C50FA759585D5 /* Voxi */,
+				1EBFABD5F43D07DF4577431C /* VoxiTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		616BD8DCA648B4CDCE4FC3DD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				149277C3EFA76F001653D154 /* EndpointProfile.swift in Sources */,
+				001C89F6AE536D0DA770C6A5 /* Logger.swift in Sources */,
+				7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */,
+				817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */,
+				ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */,
+				849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */,
+				9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */,
+				33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */,
+				D12E704904C109F8F6B916C7 /* VoxiApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AB398E03C9094AE204FE7941 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */,
+				CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */,
+				6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		317D5C862622CC4E2C769CEF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AFE9741FEA0C50FA759585D5 /* Voxi */;
+			targetProxy = 19FEB8D8D24DEFFAEC8EFFE2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		46ADCA6C990EB9A5057CB896 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				INFOPLIST_FILE = Voxi/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxi.app;
+				PRODUCT_NAME = Voxi;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		50E2E9CDD58FBC5B2A1F24C1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Voxi Self-Signed Code Signing";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		67C58DBE1870B6896D7EF995 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = NO;
+				INFOPLIST_FILE = Voxi/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxi.app;
+				PRODUCT_NAME = Voxi;
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Debug;
+		};
+		845698F59AEF127B64D88BFC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Voxi Self-Signed Code Signing";
+				CODE_SIGN_STYLE = Manual;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = minimal;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D2927633E7F4B34F4D0B5A60 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Voxi Self-Signed Code Signing";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxi.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Voxi.app/Contents/MacOS/Voxi";
+			};
+			name = Release;
+		};
+		DEE49080AA1481BB37B98CA7 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Voxi Self-Signed Code Signing";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.voxi.app.tests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Voxi.app/Contents/MacOS/Voxi";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		8D52D25F6A895FFD46303B80 /* Build configuration list for PBXProject "Voxi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				845698F59AEF127B64D88BFC /* Debug */,
+				50E2E9CDD58FBC5B2A1F24C1 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B1B189510BA8A6582881CD1D /* Build configuration list for PBXNativeTarget "Voxi" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				67C58DBE1870B6896D7EF995 /* Debug */,
+				46ADCA6C990EB9A5057CB896 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		E70FC897206BB3F2C4C36A9D /* Build configuration list for PBXNativeTarget "VoxiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DEE49080AA1481BB37B98CA7 /* Debug */,
+				D2927633E7F4B34F4D0B5A60 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = FD20BD7979811F60ED19F90F /* Project object */;
+}

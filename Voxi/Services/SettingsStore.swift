@@ -1,0 +1,152 @@
+import Foundation
+
+/// 全部非敏感配置。Codable 模型里 **不能** 出现 API Key、Access Key、Authorization 值。
+struct VoxiSettings: Codable, Equatable {
+    /// 配置结构版本，用于将来迁移。
+    var schemaVersion: Int
+    var profiles: [EndpointProfile]
+    var activeProfileID: UUID?
+    var recordingMode: RecordingMode
+    var shortcut: ShortcutConfiguration
+    var textMode: TextMode
+    var autoInsertEnabled: Bool
+    var showInterimTextInMenuBar: Bool
+
+    static let currentSchemaVersion = 1
+
+    init(
+        schemaVersion: Int = VoxiSettings.currentSchemaVersion,
+        profiles: [EndpointProfile] = VoxiSettings.defaultProfiles(),
+        activeProfileID: UUID? = nil,
+        recordingMode: RecordingMode = .holdToTalk,
+        shortcut: ShortcutConfiguration = .default,
+        textMode: TextMode = TextMode(),
+        autoInsertEnabled: Bool = true,
+        showInterimTextInMenuBar: Bool = true
+    ) {
+        self.schemaVersion = schemaVersion
+        self.profiles = profiles
+        self.activeProfileID = activeProfileID ?? profiles.first?.id
+        self.recordingMode = recordingMode
+        self.shortcut = shortcut
+        self.textMode = textMode
+        self.autoInsertEnabled = autoInsertEnabled
+        self.showInterimTextInMenuBar = showInterimTextInMenuBar
+    }
+
+    /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
+    static func defaultProfiles() -> [EndpointProfile] {
+        [.defaultOpenAIProfile()]
+    }
+
+    var activeProfile: EndpointProfile? {
+        guard let activeProfileID else { return profiles.first }
+        return profiles.first { $0.id == activeProfileID } ?? profiles.first
+    }
+
+    // MARK: - 迁移
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
+             textMode, autoInsertEnabled, showInterimTextInMenuBar
+    }
+
+    /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = VoxiSettings()
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
+        let storedProfiles = try container.decodeIfPresent([EndpointProfile].self, forKey: .profiles) ?? []
+        profiles = storedProfiles.isEmpty ? defaults.profiles : storedProfiles
+        activeProfileID = try container.decodeIfPresent(UUID.self, forKey: .activeProfileID)
+            ?? profiles.first?.id
+        recordingMode = try container.decodeIfPresent(RecordingMode.self, forKey: .recordingMode) ?? .holdToTalk
+        shortcut = try container.decodeIfPresent(ShortcutConfiguration.self, forKey: .shortcut) ?? .default
+        textMode = try container.decodeIfPresent(TextMode.self, forKey: .textMode) ?? TextMode()
+        autoInsertEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoInsertEnabled) ?? true
+        showInterimTextInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showInterimTextInMenuBar) ?? true
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(VoxiSettings.currentSchemaVersion, forKey: .schemaVersion)
+        try container.encode(profiles, forKey: .profiles)
+        try container.encodeIfPresent(activeProfileID, forKey: .activeProfileID)
+        try container.encode(recordingMode, forKey: .recordingMode)
+        try container.encode(shortcut, forKey: .shortcut)
+        try container.encode(textMode, forKey: .textMode)
+        try container.encode(autoInsertEnabled, forKey: .autoInsertEnabled)
+        try container.encode(showInterimTextInMenuBar, forKey: .showInterimTextInMenuBar)
+    }
+}
+
+/// UserDefaults 持久化。敏感值走 `KeychainService`，这里只存 item 引用。
+@MainActor
+final class SettingsStore: ObservableObject {
+    static let storageKey = "com.voxi.settings"
+
+    private let defaults: UserDefaults
+    private let storageKey: String
+
+    @Published var settings: VoxiSettings {
+        didSet { persist() }
+    }
+
+    init(userDefaults: UserDefaults = .standard, storageKey: String = SettingsStore.storageKey) {
+        self.defaults = userDefaults
+        self.storageKey = storageKey
+        self.settings = Self.load(from: userDefaults, storageKey: storageKey)
+    }
+
+    var activeProfile: EndpointProfile? {
+        settings.activeProfile
+    }
+
+    func updateActiveProfile(_ profile: EndpointProfile) {
+        if let index = settings.profiles.firstIndex(where: { $0.id == profile.id }) {
+            settings.profiles[index] = profile
+        } else {
+            settings.profiles.append(profile)
+        }
+        settings.activeProfileID = profile.id
+    }
+
+    func addProfile(_ profile: EndpointProfile) {
+        settings.profiles.append(profile)
+        settings.activeProfileID = profile.id
+    }
+
+    func removeProfile(id: UUID) {
+        settings.profiles.removeAll { $0.id == id }
+        if settings.activeProfileID == id {
+            settings.activeProfileID = settings.profiles.first?.id
+        }
+        if settings.profiles.isEmpty {
+            settings.profiles = VoxiSettings.defaultProfiles()
+            settings.activeProfileID = settings.profiles.first?.id
+        }
+    }
+
+    // MARK: - 读写
+
+    static func load(from defaults: UserDefaults, storageKey: String = storageKey) -> VoxiSettings {
+        guard let data = defaults.data(forKey: storageKey) else {
+            return VoxiSettings()
+        }
+        do {
+            return try JSONDecoder().decode(VoxiSettings.self, from: data)
+        } catch {
+            Logger.settings.error("设置解析失败，使用默认配置: \(String(describing: error), privacy: .public)")
+            return VoxiSettings()
+        }
+    }
+
+    private func persist() {
+        do {
+            let data = try JSONEncoder().encode(settings)
+            defaults.set(data, forKey: storageKey)
+        } catch {
+            Logger.settings.error("设置写入失败: \(String(describing: error), privacy: .public)")
+        }
+    }
+}

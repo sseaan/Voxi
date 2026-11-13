@@ -1,0 +1,72 @@
+name: Voxi
+options:
+  bundleIdPrefix: com.voxi
+  deploymentTarget:
+    macOS: "13.0"
+  createIntermediateGroups: true
+  developmentLanguage: zh-Hans
+  xcodeVersion: "27.2"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Voxi Self-Signed Code Signing"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_HARDENED_RUNTIME: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: minimal
+    CLANG_ENABLE_MODULES: YES
+
+targets:
+  Voxi:
+    type: application
+    platform: macOS
+    sources:
+      - path: Voxi
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voxi.app
+        PRODUCT_NAME: Voxi
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_APP_SANDBOX: NO
+        SWIFT_EMIT_LOC_STRINGS: YES
+    info:
+      path: Voxi/Info.plist
+      properties:
+        CFBundleName: Voxi
+        CFBundleDisplayName: Voxi
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        LSApplicationCategoryType: public.app-category.productivity
+        LSUIElement: true
+        NSMicrophoneUsageDescription: "Voxi 仅在你按下快捷键录音时访问麦克风，用于把你说的内容转写为文字。录音只在你配置的语音识别服务处理，不会上传到 Voxi。"
+        NSHumanReadableCopyright: "© 2025 Voxi"
+        NSSupportsAutomaticTermination: false
+        NSSupportsSuddenTermination: false
+    scheme:
+      testTargets:
+        - VoxiTests
+      gatherCoverageData: false
+
+  VoxiTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: VoxiTests
+    dependencies:
+      - target: Voxi
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.voxi.app.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Voxi.app/Contents/MacOS/Voxi"
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Voxi Self-Signed Code Signing"
