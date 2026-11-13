@@ -25,14 +25,14 @@ struct TextModeEditorView: View {
                         RoundedRectangle(cornerRadius: 6)
                             .stroke(Color.secondary.opacity(0.25))
                     )
-                Text("部分端点会忽略 prompt；Voxi 不会用第二个模型改写结果。")
+                Text("OpenAI-compatible 端点可能忽略 prompt；火山引擎流式接口不使用 prompt。Voxi 不会用第二个模型改写结果。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             Section("标点与换行") {
                 Toggle("保留标点", isOn: $settings.settings.textMode.addPunctuation)
-                Text("关闭后只去掉句尾标点，不改动正文。")
+                Text("关闭后只去掉句尾标点，不改动正文。服务端是否支持标点控制取决于端点。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

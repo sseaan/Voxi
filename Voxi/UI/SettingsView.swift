@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -7,7 +8,7 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            GeneralSettingsView(settings: settings)
+            GeneralSettingsView(settings: settings, permissions: coordinator.permissions)
                 .tabItem { Label("通用", systemImage: "gearshape") }
             TextModeEditorView(settings: settings)
                 .tabItem { Label("文本", systemImage: "textformat") }
@@ -22,7 +23,12 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var permissions: PermissionService
     @State private var shortcutMessage: String?
+
+    private var isAccessibilityTrusted: Bool {
+        permissions.isAccessibilityTrusted()
+    }
 
     var body: some View {
         Form {
@@ -69,8 +75,38 @@ struct GeneralSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("权限") {
+                LabeledContent("麦克风") {
+                    Text(permissions.microphoneAuthorization.displayName)
+                        .foregroundStyle(permissions.microphoneAuthorization.isUsable ? Color.secondary : Color.orange)
+                }
+                LabeledContent("辅助功能（自动输入）") {
+                    HStack(spacing: 8) {
+                        Text(isAccessibilityTrusted ? "已授权" : "未授权")
+                            .foregroundStyle(isAccessibilityTrusted ? Color.secondary : Color.orange)
+                        if !isAccessibilityTrusted {
+                            Button("请求权限") {
+                                permissions.promptAccessibilityAccess()
+                            }
+                            Button("打开设置…") {
+                                PermissionService.openSettingsPane(.accessibility)
+                            }
+                        }
+                    }
+                }
+                Text("Voxi 只在录音结束后向当前焦点控件输入文字，不会读取屏幕内容。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear {
+            permissions.refresh()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            permissions.refresh()
+        }
     }
 }
 

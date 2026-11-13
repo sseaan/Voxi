@@ -123,7 +123,27 @@ final class FakeTranscriptionProvider: TranscriptionProvider {
 }
 
 @MainActor
+final class FakeTextInserter: TextInserting {
+    var outcome: TextInsertionOutcome = .inserted(via: .pasteboard)
+    private(set) var insertions: [(text: String, pid: pid_t?)] = []
+
+    func insert(_ text: String, expectedFrontmostPID: pid_t?) async -> TextInsertionOutcome {
+        insertions.append((text, expectedFrontmostPID))
+        return outcome
+    }
+}
+
+@MainActor
 final class AppCoordinatorTests: XCTestCase {
+    private var textInserter: FakeTextInserter!
+    private var frontmost: FakeFrontmostApp!
+
+    override func setUp() {
+        super.setUp()
+        textInserter = FakeTextInserter()
+        frontmost = FakeFrontmostApp()
+    }
+
     private func makeCoordinator(
         recordingMode: RecordingMode = .holdToTalk,
         audioCapture: StubAudioCapture = StubAudioCapture(),
@@ -142,7 +162,9 @@ final class AppCoordinatorTests: XCTestCase {
             appState: state,
             microphoneGate: microphoneGate,
             audioCapture: audioCapture,
-            providers: [provider]
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
         )
         return (coordinator, store, state, provider)
     }
@@ -428,7 +450,7 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.stopRecording()
         await waitFor { state.state == .idle }
         XCTAssertEqual(audio.finishCount, 1)
-        XCTAssertTrue(state.noticeMessage?.contains("识别完成") ?? false)
+        XCTAssertNotNil(state.lastResult)
     }
 
     func testEmptyRecordingReturnsToIdleWithError() async {
@@ -472,7 +494,9 @@ final class AppCoordinatorTests: XCTestCase {
             appState: state,
             microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
             audioCapture: StubAudioCapture(),
-            providers: [provider]
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
         )
 
         coordinator.startRecording()
@@ -494,7 +518,9 @@ final class AppCoordinatorTests: XCTestCase {
             appState: state,
             microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
             audioCapture: StubAudioCapture(),
-            providers: [provider]
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
         )
 
         coordinator.handleShortcutPress()
@@ -524,6 +550,71 @@ final class AppCoordinatorTests: XCTestCase {
         await waitFor { state.state == .idle }
         XCTAssertEqual(state.interimText, "", "结束流程后清空预览")
         XCTAssertEqual(state.lastResult?.text, "识别结果")
+    }
+
+    func testAutoInsertUsesFinalizedTextAndCapturedPID() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "你好。"
+        let (coordinator, store, state, _) = makeCoordinator(provider: provider)
+        store.settings.textMode = TextMode(
+            language: .simplifiedChinese,
+            prompt: "",
+            addPunctuation: false,
+            newlineBehavior: .trailingNewline
+        )
+
+        coordinator.handleShortcutPress()
+        await waitFor { state.state == .recording }
+        coordinator.handleShortcutRelease()
+        await waitFor { state.state == .idle }
+
+        XCTAssertEqual(textInserter.insertions.count, 1)
+        XCTAssertEqual(textInserter.insertions.first?.text, "你好\n")
+        XCTAssertEqual(textInserter.insertions.first?.pid, 777, "应记录快捷键触发时的前台 PID")
+        XCTAssertEqual(state.lastResult?.text, "你好\n")
+        XCTAssertTrue(state.noticeMessage?.contains("已输入") ?? false)
+    }
+
+    func testMenuTriggeredInsertionDoesNotPinFrontmostPID() async {
+        let (coordinator, _, state, _) = makeCoordinator()
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+
+        XCTAssertEqual(textInserter.insertions.count, 1)
+        XCTAssertNil(textInserter.insertions.first?.pid, "菜单触发的录音不应锁定前台 PID")
+    }
+
+    func testAutoInsertDisabledKeepsResultForManualCopy() async {
+        let (coordinator, store, state, _) = makeCoordinator()
+        store.settings.autoInsertEnabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+
+        XCTAssertTrue(textInserter.insertions.isEmpty)
+        XCTAssertNotNil(state.lastResult)
+        XCTAssertTrue(state.noticeMessage?.contains("复制") ?? false)
+    }
+
+    func testInsertionFailureOffersCopyFallback() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "保留的文本"
+        let (coordinator, _, state, _) = makeCoordinator(provider: provider)
+        textInserter.outcome = .requiresManualCopy(reason: "前台应用已切换")
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor { state.state == .failed }
+
+        XCTAssertEqual(state.lastResult?.text, "保留的文本")
+        XCTAssertEqual(state.error?.recovery, .copyTranscript("保留的文本"))
+        XCTAssertTrue(state.errorMessage?.contains("前台应用已切换") ?? false)
     }
 
     func testMenuBarElapsedFormatting() {

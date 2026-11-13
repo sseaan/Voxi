@@ -19,6 +19,8 @@ final class AppCoordinator: ObservableObject {
     private let microphoneGate: MicrophoneAccessGating
     private let audioCapture: AudioCapturing
     private let providers: [EndpointProfile.ProviderKind: TranscriptionProvider]
+    private let textInserter: TextInserting
+    private let frontmostProvider: FrontmostAppProviding
     private let shortcutService = ShortcutService()
 
     private var permissionTask: Task<Void, Never>?
@@ -34,13 +36,17 @@ final class AppCoordinator: ObservableObject {
     /// 本次 session 是否由“按住快捷键”触发（菜单/API 触发不受松键保护影响）。
     private var startedWithShortcutHeld = false
     private var capturedByteCount = 0
+    /// 快捷键触发时记录的前台应用 PID；输入前必须仍然一致。
+    private var targetApplicationPID: pid_t?
 
     init(
         settings: SettingsStore,
         appState: AppState,
         microphoneGate: MicrophoneAccessGating = SystemAudioPermissionProvider(),
         audioCapture: AudioCapturing = AudioCaptureService(),
-        providers: [TranscriptionProvider]? = nil
+        providers: [TranscriptionProvider]? = nil,
+        textInserter: TextInserting? = nil,
+        frontmostProvider: FrontmostAppProviding = SystemFrontmostApp()
     ) {
         self.settings = settings
         self.appState = appState
@@ -50,6 +56,8 @@ final class AppCoordinator: ObservableObject {
 
         let resolvedProviders = providers ?? [OpenAICompatibleProvider(), VolcengineStreamingProvider()]
         self.providers = Dictionary(uniqueKeysWithValues: resolvedProviders.map { ($0.kind, $0) })
+        self.textInserter = textInserter ?? TextInsertionService(frontmost: frontmostProvider)
+        self.frontmostProvider = frontmostProvider
     }
 
     /// 应用启动时调用一次：注册全局快捷键并跟随设置变化。
@@ -172,6 +180,8 @@ final class AppCoordinator: ObservableObject {
         let sessionID = UUID()
         currentSessionID = sessionID
         startedWithShortcutHeld = shortcutHeld
+        // 只对快捷键触发的录音锁定目标应用；菜单按钮触发时前台就是 Voxi 自己。
+        targetApplicationPID = shortcutHeld ? frontmostProvider.currentPID() : nil
         appState.beginSession(id: sessionID, provider: profile.kind)
         Logger.app.info("开始录音 session=\(sessionID.uuidString, privacy: .public) provider=\(profile.kind.rawValue, privacy: .public)")
 
@@ -398,13 +408,40 @@ final class AppCoordinator: ObservableObject {
             updatesTask?.cancel()
             updatesTask = nil
             appState.setInterimText("")
-            appState.setLastResult(result)
+
+            let finalText = settings.settings.textMode.finalize(result.text)
+            var storedResult = result
+            storedResult.text = finalText
+            appState.setLastResult(storedResult)
 
             if let logID = result.logID {
                 Logger.app.info("识别完成 logID=\(logID, privacy: .public)")
             }
-            appState.present(notice: "识别完成，可在下方复制结果。")
-            transition(to: .idle)
+
+            if settings.settings.autoInsertEnabled,
+               !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                transition(to: .inserting)
+                let outcome = await textInserter.insert(finalText, expectedFrontmostPID: targetApplicationPID)
+                targetApplicationPID = nil
+                guard currentSessionID == sessionID else {
+                    // 输入期间用户取消/开始新录音：不再改写状态。
+                    return
+                }
+                switch outcome {
+                case .inserted:
+                    appState.present(notice: "已输入到前台应用。")
+                    transition(to: .idle)
+                case .requiresManualCopy(let reason):
+                    appState.present(error: AppError(
+                        message: "识别完成，但无法自动输入：\(reason)。请复制下方结果。",
+                        recovery: .copyTranscript(finalText)
+                    ))
+                    transition(to: .failed)
+                }
+            } else {
+                appState.present(notice: "识别完成，可在下方复制结果。")
+                transition(to: .idle)
+            }
         } catch {
             AudioCaptureService.removeRecording(at: metadata.fileURL)
             transcriptionSession = nil
