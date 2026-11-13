@@ -14,18 +14,25 @@
 		1E91CC24B28460B53795E674 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE1A2CCC8BD72263589EB87 /* AppState.swift */; };
 		209FB176BC28024B4A616A0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8037205209E246ED13395AF /* SettingsView.swift */; };
 		23CAAF0A556E5213CD150583 /* TextModeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */; };
+		2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */; };
 		33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */; };
 		38BB73D613FE0BBC327A4165 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E44A085BCA3EFB4E954292 /* AppCoordinator.swift */; };
+		449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */; };
+		46245518D89E9D915E0C4CF7 /* AudioConversionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48541423C4189BA56AEAC747 /* AudioConversionTests.swift */; };
 		6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */; };
 		7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C819C7D57E572C842CA2968 /* RecordingMode.swift */; };
 		817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C915665C4131D29A46F25A /* RecordingState.swift */; };
 		849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */; };
 		9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */; };
+		BF6BF08F53F9F0E74DEFAB92 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */; };
 		CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */; };
 		D12E704904C109F8F6B916C7 /* VoxiApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352DDCDC5F3833C9EC3D4D1A /* VoxiApp.swift */; };
 		D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */; };
+		DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99076712E036C9926F2FF860 /* PermissionService.swift */; };
 		E6578F51F7B7033DAEB63702 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CADAA4F9510669F40A1C63A /* MenuBarView.swift */; };
+		EBAAFD71ABDE417D3A5C28DE /* WAVFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A2FE3515ED55DDB93AC08F /* WAVFileWriter.swift */; };
 		ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CA3F36E3B96C0524780F4F /* SettingsStore.swift */; };
+		F079D6444485C416D2581E4D /* ShortcutRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */; };
 		F17C17E60430CA8BEA6A880B /* AppCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8423D644E4AEA07F824D1E /* AppCoordinatorTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -41,13 +48,16 @@
 
 /* Begin PBXFileReference section */
 		0765F3B1517F7C139568E4FF /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
 		15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionResult.swift; sourceTree = "<group>"; };
+		24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderView.swift; sourceTree = "<group>"; };
 		2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConfiguration.swift; sourceTree = "<group>"; };
 		25CA3F36E3B96C0524780F4F /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
 		352DDCDC5F3833C9EC3D4D1A /* VoxiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiApp.swift; sourceTree = "<group>"; };
 		3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextModeEditorView.swift; sourceTree = "<group>"; };
 		44C6CA7CCA4CB89F340C5351 /* VoxiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VoxiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		48541423C4189BA56AEAC747 /* AudioConversionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioConversionTests.swift; sourceTree = "<group>"; };
 		4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextMode.swift; sourceTree = "<group>"; };
 		57C9E45456AA639B9D729E82 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiTests.swift; sourceTree = "<group>"; };
@@ -55,13 +65,17 @@
 		72E44A085BCA3EFB4E954292 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinator.swift; sourceTree = "<group>"; };
 		7FC5595E22A9F7D5F2997552 /* Voxi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voxi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8CADAA4F9510669F40A1C63A /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
+		99076712E036C9926F2FF860 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
 		A8037205209E246ED13395AF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AFE1A2CCC8BD72263589EB87 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutServiceTests.swift; sourceTree = "<group>"; };
 		BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointProfile.swift; sourceTree = "<group>"; };
 		BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointEditorView.swift; sourceTree = "<group>"; };
 		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingStateTests.swift; sourceTree = "<group>"; };
 		ED8423D644E4AEA07F824D1E /* AppCoordinatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppCoordinatorTests.swift; sourceTree = "<group>"; };
+		F0A2FE3515ED55DDB93AC08F /* WAVFileWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WAVFileWriter.swift; sourceTree = "<group>"; };
+		F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -81,7 +95,10 @@
 		1B28536F7CC88DAED96C08C8 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */,
+				99076712E036C9926F2FF860 /* PermissionService.swift */,
 				25CA3F36E3B96C0524780F4F /* SettingsStore.swift */,
+				0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -92,6 +109,7 @@
 				BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */,
 				8CADAA4F9510669F40A1C63A /* MenuBarView.swift */,
 				A8037205209E246ED13395AF /* SettingsView.swift */,
+				24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */,
 				3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */,
 			);
 			path = UI;
@@ -132,6 +150,7 @@
 			children = (
 				57C9E45456AA639B9D729E82 /* Logger.swift */,
 				0765F3B1517F7C139568E4FF /* SettingsWindowController.swift */,
+				F0A2FE3515ED55DDB93AC08F /* WAVFileWriter.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -140,8 +159,10 @@
 			isa = PBXGroup;
 			children = (
 				ED8423D644E4AEA07F824D1E /* AppCoordinatorTests.swift */,
+				48541423C4189BA56AEAC747 /* AudioConversionTests.swift */,
 				EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */,
 				15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */,
+				B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */,
 				5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */,
 			);
 			path = VoxiTests;
@@ -241,20 +262,25 @@
 			files = (
 				38BB73D613FE0BBC327A4165 /* AppCoordinator.swift in Sources */,
 				1E91CC24B28460B53795E674 /* AppState.swift in Sources */,
+				2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */,
 				04496559C79CE3C6842F056A /* EndpointEditorView.swift in Sources */,
 				149277C3EFA76F001653D154 /* EndpointProfile.swift in Sources */,
 				001C89F6AE536D0DA770C6A5 /* Logger.swift in Sources */,
 				E6578F51F7B7033DAEB63702 /* MenuBarView.swift in Sources */,
+				DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */,
 				7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */,
 				817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */,
 				ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */,
 				209FB176BC28024B4A616A0B /* SettingsView.swift in Sources */,
 				1CA7033B728012C801A43FC4 /* SettingsWindowController.swift in Sources */,
 				849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */,
+				F079D6444485C416D2581E4D /* ShortcutRecorderView.swift in Sources */,
+				BF6BF08F53F9F0E74DEFAB92 /* ShortcutService.swift in Sources */,
 				9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */,
 				23CAAF0A556E5213CD150583 /* TextModeEditorView.swift in Sources */,
 				33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */,
 				D12E704904C109F8F6B916C7 /* VoxiApp.swift in Sources */,
+				EBAAFD71ABDE417D3A5C28DE /* WAVFileWriter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -263,8 +289,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				F17C17E60430CA8BEA6A880B /* AppCoordinatorTests.swift in Sources */,
+				46245518D89E9D915E0C4CF7 /* AudioConversionTests.swift in Sources */,
 				D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */,
 				CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */,
+				449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */,
 				6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

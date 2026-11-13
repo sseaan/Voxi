@@ -1,12 +1,30 @@
 import Foundation
 import SwiftUI
 
+/// 可恢复错误。UI 根据 `recovery` 提供“打开系统设置”“复制文本”等动作。
+struct AppError: Identifiable, Equatable {
+    enum Recovery: Equatable {
+        case openMicrophoneSettings
+        case openAccessibilitySettings
+        case copyTranscript(String)
+    }
+
+    var id = UUID()
+    var message: String
+    var recovery: Recovery?
+
+    init(message: String, recovery: Recovery? = nil) {
+        self.message = message
+        self.recovery = recovery
+    }
+}
+
 /// 单一 UI 状态来源。只保存当前状态、提示、当前 provider 与临时识别预览；
 /// 所有状态写入都必须经过 `AppCoordinator`。
 @MainActor
 final class AppState: ObservableObject {
     @Published private(set) var state: RecordingState = .idle
-    @Published private(set) var errorMessage: String?
+    @Published private(set) var error: AppError?
     @Published private(set) var noticeMessage: String?
     @Published private(set) var activeProviderKind: EndpointProfile.ProviderKind?
     /// 火山流式识别的临时文本，仅用于菜单栏预览，绝不插入前台应用。
@@ -17,6 +35,8 @@ final class AppState: ObservableObject {
     @Published private(set) var lastResult: TranscriptionResult?
     @Published private(set) var lastLogID: String?
 
+    var errorMessage: String? { error?.message }
+
     // MARK: - 协调器内部写入
 
     func beginSession(id: UUID, provider: EndpointProfile.ProviderKind) {
@@ -25,7 +45,7 @@ final class AppState: ObservableObject {
         interimText = ""
         lastResult = nil
         lastLogID = nil
-        errorMessage = nil
+        error = nil
         noticeMessage = nil
     }
 
@@ -45,8 +65,8 @@ final class AppState: ObservableObject {
         }
     }
 
-    func present(error: String?) {
-        errorMessage = error
+    func present(error: AppError?) {
+        self.error = error
         if error != nil {
             noticeMessage = nil
         }
@@ -55,12 +75,12 @@ final class AppState: ObservableObject {
     func present(notice: String?) {
         noticeMessage = notice
         if notice != nil {
-            errorMessage = nil
+            error = nil
         }
     }
 
     func clearMessages() {
-        errorMessage = nil
+        error = nil
         noticeMessage = nil
     }
 

@@ -11,7 +11,9 @@ struct VoxiApp: App {
         let state = AppState()
         _settingsStore = StateObject(wrappedValue: settings)
         _appState = StateObject(wrappedValue: state)
-        _coordinator = StateObject(wrappedValue: AppCoordinator(settings: settings, appState: state))
+        let coordinator = AppCoordinator(settings: settings, appState: state)
+        _coordinator = StateObject(wrappedValue: coordinator)
+        coordinator.activate()
     }
 
     var body: some Scene {

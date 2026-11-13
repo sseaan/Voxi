@@ -13,8 +13,17 @@ struct MenuBarView: View {
             if let notice = appState.noticeMessage {
                 messageRow(notice, icon: "info.circle", color: .secondary)
             }
-            if let error = appState.errorMessage {
-                messageRow(error, icon: "exclamationmark.triangle.fill", color: .orange)
+            if let error = appState.error {
+                VStack(alignment: .leading, spacing: 6) {
+                    messageRow(error.message, icon: "exclamationmark.triangle.fill", color: .orange)
+                    if let recovery = error.recovery {
+                        Button(Self.recoveryTitle(recovery)) {
+                            Self.perform(recovery)
+                        }
+                        .buttonStyle(.link)
+                        .font(.callout)
+                    }
+                }
             }
             if !appState.interimText.isEmpty {
                 interimPreview
@@ -74,6 +83,27 @@ struct MenuBarView: View {
             Text(text)
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    static func recoveryTitle(_ recovery: AppError.Recovery) -> String {
+        switch recovery {
+        case .openMicrophoneSettings: return "打开麦克风设置…"
+        case .openAccessibilitySettings: return "打开辅助功能设置…"
+        case .copyTranscript(let text): return text.isEmpty ? "复制" : "复制识别结果"
+        }
+    }
+
+    static func perform(_ recovery: AppError.Recovery) {
+        switch recovery {
+        case .openMicrophoneSettings:
+            PermissionService.openSettingsPane(.microphone)
+        case .openAccessibilitySettings:
+            PermissionService.openSettingsPane(.accessibility)
+        case .copyTranscript(let text):
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
         }
     }
 

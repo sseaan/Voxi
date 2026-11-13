@@ -22,6 +22,7 @@ struct SettingsView: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject var settings: SettingsStore
+    @State private var shortcutMessage: String?
 
     var body: some View {
         Form {
@@ -39,10 +40,24 @@ struct GeneralSettingsView: View {
 
             Section("全局快捷键") {
                 LabeledContent("当前快捷键") {
-                    Text(settings.settings.shortcut.displayString)
-                        .font(.system(.body, design: .monospaced))
+                    ShortcutRecorderView(
+                        configuration: settings.settings.shortcut,
+                        onRecord: { configuration in
+                            shortcutMessage = nil
+                            settings.settings.shortcut = configuration
+                        },
+                        onInvalid: { message in
+                            shortcutMessage = message
+                        }
+                    )
+                    .frame(width: 180, height: 26)
                 }
-                Text("快捷键录制与冲突检测将在快捷键服务接入后提供。")
+                if let shortcutMessage {
+                    Text(shortcutMessage)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+                Text("点击上方快捷键后按下新的组合键。组合键冲突时会在菜单栏提示。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
