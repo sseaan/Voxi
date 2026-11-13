@@ -52,6 +52,7 @@ final class StubAudioCapture: AudioCapturing, @unchecked Sendable {
     }
 }
 
+@MainActor
 final class FakeTranscriptionSession: TranscriptionSession {
     let updates: AsyncThrowingStream<TranscriptionUpdate, Error>
     private let continuation: AsyncThrowingStream<TranscriptionUpdate, Error>.Continuation
@@ -92,16 +93,30 @@ final class FakeTranscriptionSession: TranscriptionSession {
         cancelCallCount += 1
         continuation.finish()
     }
+
+    func emit(_ update: TranscriptionUpdate) {
+        continuation.yield(update)
+    }
 }
 
+@MainActor
 final class FakeTranscriptionProvider: TranscriptionProvider {
-    let kind: EndpointProfile.ProviderKind = .openAICompatible
+    let kind: EndpointProfile.ProviderKind
     var makeSessionError: Error?
-    var session = FakeTranscriptionSession()
+    var session: FakeTranscriptionSession
+    var makeSessionDelayNanoseconds: UInt64 = 0
     private(set) var makeSessionCallCount = 0
+
+    init(kind: EndpointProfile.ProviderKind = .openAICompatible) {
+        self.kind = kind
+        self.session = FakeTranscriptionSession()
+    }
 
     func makeSession(profile: EndpointProfile, options: TranscriptionOptions) async throws -> any TranscriptionSession {
         makeSessionCallCount += 1
+        if makeSessionDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: makeSessionDelayNanoseconds)
+        }
         if let makeSessionError { throw makeSessionError }
         return session
     }
@@ -112,9 +127,10 @@ final class AppCoordinatorTests: XCTestCase {
     private func makeCoordinator(
         recordingMode: RecordingMode = .holdToTalk,
         audioCapture: StubAudioCapture = StubAudioCapture(),
-        provider: FakeTranscriptionProvider = FakeTranscriptionProvider(),
+        provider: FakeTranscriptionProvider? = nil,
         microphoneGate: MicrophoneAccessGating = StubMicrophoneGate(authorization: .granted, grants: true)
     ) -> (AppCoordinator, SettingsStore, AppState, FakeTranscriptionProvider) {
+        let provider = provider ?? FakeTranscriptionProvider()
         let suite = "test.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
@@ -441,6 +457,74 @@ final class AppCoordinatorTests: XCTestCase {
     }
 
     // MARK: - UI 辅助
+
+    func testVolcengineFlowShowsConnectingBeforeRecording() async {
+        let provider = FakeTranscriptionProvider(kind: .volcengineStreaming)
+        provider.makeSessionDelayNanoseconds = 120_000_000
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let store = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        store.settings.profiles = [.defaultVolcengineProfile()]
+        store.settings.activeProfileID = store.settings.profiles.first?.id
+        let state = AppState()
+        let coordinator = AppCoordinator(
+            settings: store,
+            appState: state,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: StubAudioCapture(),
+            providers: [provider]
+        )
+
+        coordinator.startRecording()
+        XCTAssertEqual(state.state, .connecting, "火山必须先进入连接状态")
+        await waitFor { state.state == .recording }
+    }
+
+    func testReleasingShortcutWhileConnectingCancelsVolcengineSession() async {
+        let provider = FakeTranscriptionProvider(kind: .volcengineStreaming)
+        provider.makeSessionDelayNanoseconds = 150_000_000
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let store = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        store.settings.profiles = [.defaultVolcengineProfile()]
+        store.settings.activeProfileID = store.settings.profiles.first?.id
+        let state = AppState()
+        let coordinator = AppCoordinator(
+            settings: store,
+            appState: state,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: StubAudioCapture(),
+            providers: [provider]
+        )
+
+        coordinator.handleShortcutPress()
+        await waitFor { state.state == .connecting }
+        coordinator.handleShortcutRelease()
+        XCTAssertEqual(state.state, .idle)
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(state.state, .idle)
+        XCTAssertNil(state.sessionID)
+    }
+
+    func testInterimUpdatesOnlyAffectPreviewAndNeverResult() async {
+        let provider = FakeTranscriptionProvider()
+        let (coordinator, _, state, _) = makeCoordinator(provider: provider)
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+
+        provider.session.emit(.interim("临时文本一"))
+        await waitFor { state.interimText == "临时文本一" }
+        XCTAssertNil(state.lastResult, "临时结果不得进入最终结果")
+
+        provider.session.emit(.interim("临时文本一，更多"))
+        await waitFor { state.interimText == "临时文本一，更多" }
+
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+        XCTAssertEqual(state.interimText, "", "结束流程后清空预览")
+        XCTAssertEqual(state.lastResult?.text, "识别结果")
+    }
 
     func testMenuBarElapsedFormatting() {
         XCTAssertEqual(MenuBarView.formatted(elapsed: 0), "0:00")

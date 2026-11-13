@@ -24,6 +24,7 @@ final class AppCoordinator: ObservableObject {
     private var permissionTask: Task<Void, Never>?
     private var audioTask: Task<Void, Never>?
     private var transcriptionSession: (any TranscriptionSession)?
+    private var updatesTask: Task<Void, Never>?
     private var finishTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
@@ -47,7 +48,7 @@ final class AppCoordinator: ObservableObject {
         self.audioCapture = audioCapture
         self.permissions = PermissionService()
 
-        let resolvedProviders = providers ?? [OpenAICompatibleProvider()]
+        let resolvedProviders = providers ?? [OpenAICompatibleProvider(), VolcengineStreamingProvider()]
         self.providers = Dictionary(uniqueKeysWithValues: resolvedProviders.map { ($0.kind, $0) })
     }
 
@@ -109,8 +110,9 @@ final class AppCoordinator: ObservableObject {
         case .ignore: break
         }
 
-        // 按住模式下，权限弹窗还没结束就松开快捷键：取消本次录音，避免永久录音。
-        if event == .keyUp, mode == .holdToTalk, appState.state == .requestingPermission {
+        // 按住模式下，权限弹窗或连接还没结束就松开快捷键：取消本次录音，避免永久录音。
+        if event == .keyUp, mode == .holdToTalk,
+           appState.state == .requestingPermission || appState.state == .connecting {
             cancelCurrentSession()
         }
     }
@@ -209,6 +211,8 @@ final class AppCoordinator: ObservableObject {
         permissionTask = nil
         audioTask?.cancel()
         audioTask = nil
+        updatesTask?.cancel()
+        updatesTask = nil
         finishTask?.cancel()
         finishTask = nil
 
@@ -280,17 +284,44 @@ final class AppCoordinator: ObservableObject {
             audioDuration: nil
         )
 
+        // 火山需要先建连并发送初始化帧，成功后才开始采集音频。
+        if profile.kind == .volcengineStreaming {
+            transition(to: .connecting)
+        }
+
         Task { [weak self] in
             do {
                 let session = try await provider.makeSession(profile: profile, options: options)
-                guard let self, self.currentSessionID == sessionID, self.appState.state == .requestingPermission else {
+                guard let self, self.currentSessionID == sessionID,
+                      self.appState.state == .requestingPermission || self.appState.state == .connecting
+                else {
                     await session.cancel()
                     return
                 }
                 self.transcriptionSession = session
+                self.observeUpdates(session: session, sessionID: sessionID)
                 try await self.startAudioCapture(sessionID: sessionID, session: session)
             } catch {
                 self?.failStart(error, sessionID: sessionID)
+            }
+        }
+    }
+
+    /// 订阅流式临时结果：只更新菜单栏预览，绝不写入前台应用。
+    private func observeUpdates(session: any TranscriptionSession, sessionID: UUID) {
+        updatesTask?.cancel()
+        let showInMenuBar = settings.settings.showInterimTextInMenuBar
+        updatesTask = Task { [weak self] in
+            do {
+                for try await update in session.updates {
+                    guard let self, self.currentSessionID == sessionID else { return }
+                    if case .interim(let text) = update {
+                        self.appState.setInterimText(showInMenuBar ? text : "")
+                    }
+                }
+            } catch {
+                // 错误由 finish()/cancel() 统一上报，这里只结束预览。
+                Logger.app.debug("临时结果流结束: \(String(describing: error), privacy: .public)")
             }
         }
     }
@@ -301,7 +332,9 @@ final class AppCoordinator: ObservableObject {
         let stream = try await Self.runWithTimeout(seconds: 10) {
             try capture.start()
         }
-        guard currentSessionID == sessionID, appState.state == .requestingPermission else {
+        guard currentSessionID == sessionID,
+              appState.state == .requestingPermission || appState.state == .connecting
+        else {
             // 启动期间用户已取消或开始新的 session：丢弃这次录音。
             Logger.app.info("录音启动完成时 session 已失效，丢弃采集 session=\(sessionID.uuidString, privacy: .public)")
             Task.detached(priority: .utility) { capture.cancel() }
@@ -348,6 +381,7 @@ final class AppCoordinator: ObservableObject {
             return
         }
 
+        appState.setInterimText("")
         transition(to: .transcribing)
         let optionsDuration = metadata.duration
         Logger.app.info("录音结束 duration=\(String(format: "%.2f", optionsDuration), privacy: .public)s，开始识别")
@@ -361,6 +395,9 @@ final class AppCoordinator: ObservableObject {
                 return
             }
             transcriptionSession = nil
+            updatesTask?.cancel()
+            updatesTask = nil
+            appState.setInterimText("")
             appState.setLastResult(result)
 
             if let logID = result.logID {
@@ -371,6 +408,9 @@ final class AppCoordinator: ObservableObject {
         } catch {
             AudioCaptureService.removeRecording(at: metadata.fileURL)
             transcriptionSession = nil
+            updatesTask?.cancel()
+            updatesTask = nil
+            appState.setInterimText("")
 
             if let transcriptionError = error as? TranscriptionError, transcriptionError.isCancellation {
                 transition(to: .idle)
@@ -422,6 +462,9 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func cleanupTranscriptionSession() {
+        updatesTask?.cancel()
+        updatesTask = nil
+        appState.setInterimText("")
         if let session = transcriptionSession {
             transcriptionSession = nil
             Task { await session.cancel() }

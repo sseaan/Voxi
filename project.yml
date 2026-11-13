@@ -36,6 +36,7 @@ targets:
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_APP_SANDBOX: NO
         SWIFT_EMIT_LOC_STRINGS: YES
+        SWIFT_OBJC_BRIDGING_HEADER: Voxi/Support/Voxi-Bridging-Header.h
     info:
       path: Voxi/Info.plist
       properties:

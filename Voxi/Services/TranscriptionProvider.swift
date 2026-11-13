@@ -13,12 +13,14 @@ struct TranscriptionOptions {
 }
 
 /// ASR provider 统一边界。两种协议的网络交互不同，但都通过这个接口对协调器暴露。
+@MainActor
 protocol TranscriptionProvider: AnyObject {
     var kind: EndpointProfile.ProviderKind { get }
 
     func makeSession(profile: EndpointProfile, options: TranscriptionOptions) async throws -> any TranscriptionSession
 }
 
+@MainActor
 protocol TranscriptionSession: AnyObject {
     /// 中间/最终结果流。OpenAI-compatible 只会在 finish 后产出（或为空）。
     var updates: AsyncThrowingStream<TranscriptionUpdate, Error> { get }

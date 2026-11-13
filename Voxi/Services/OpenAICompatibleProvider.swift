@@ -87,6 +87,7 @@ enum OpenAICompatibleRequestBuilder {
 }
 
 /// OpenAI-compatible provider：录音期间不发送，停止后一次性上传整段 WAV。
+@MainActor
 final class OpenAICompatibleProvider: TranscriptionProvider {
     let kind: EndpointProfile.ProviderKind = .openAICompatible
 
@@ -112,6 +113,7 @@ final class OpenAICompatibleProvider: TranscriptionProvider {
     }
 }
 
+@MainActor
 final class OpenAICompatibleSession: TranscriptionSession {
     let updates: AsyncThrowingStream<TranscriptionUpdate, Error>
 

@@ -119,6 +119,7 @@ extension StubURLProtocol {
     }
 }
 
+@MainActor
 final class OpenAICompatibleProviderTests: XCTestCase {
     private var tempFileURL: URL!
 
