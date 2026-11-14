@@ -26,6 +26,15 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .about: return "info.circle"
         }
     }
+
+    var iconColor: Color {
+        switch self {
+        case .general: return Color(red: 0.23, green: 0.51, blue: 0.96)
+        case .text: return Color(red: 0.55, green: 0.36, blue: 0.96)
+        case .endpoints: return Color(red: 0.06, green: 0.64, blue: 0.60)
+        case .about: return Color(red: 0.42, green: 0.47, blue: 0.55)
+        }
+    }
 }
 
 /// 通用页与文本页的草稿：显式保存，保存后给出时间反馈。
@@ -118,27 +127,31 @@ struct SettingsCard<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             if let title {
                 Text(title)
-                    .font(.headline)
-                    .padding(.leading, 2)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 10)
             }
             VStack(alignment: .leading, spacing: 14) {
                 content
             }
-            .padding(16)
+            .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color.primary.opacity(0.06))
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
             )
             if let footer {
                 Text(footer)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 2)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -198,12 +211,13 @@ struct SettingsPage<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 18) {
                 content
             }
-            .frame(maxWidth: 620, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.vertical, 22)
+            .frame(maxWidth: 640, alignment: .leading)
+            .padding(.horizontal, 26)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }
     }

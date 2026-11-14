@@ -73,59 +73,50 @@ final class RecordingIndicatorModel: ObservableObject {
 
 struct RecordingIndicatorView: View {
     @ObservedObject var model: RecordingIndicatorModel
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        WaveformBars(levels: model.levels, isDark: colorScheme == .dark)
-            .padding(.horizontal, 14)
+        WaveformBars(levels: model.levels)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .frame(width: 200, height: 44)
-            .background(
-                Capsule()
-                    .fill(colorScheme == .dark
-                          ? Color.black.opacity(0.78)
-                          : Color.white.opacity(0.94))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(colorScheme == .dark
-                            ? Color.white.opacity(0.14)
-                            : Color.black.opacity(0.08),
-                            lineWidth: 0.8)
-            )
+            .background {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color.black.opacity(0.45))
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.22), .white.opacity(0.06)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .environment(\.colorScheme, .dark)
     }
 }
 
 struct WaveformBars: View {
     let levels: [Float]
-    var isDark: Bool
     var barCount = 26
-
-    private var gradient: LinearGradient {
-        if isDark {
-            return LinearGradient(
-                colors: [Color.white.opacity(0.96), Color(red: 0.55, green: 0.8, blue: 1.0)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        return LinearGradient(
-            colors: [Color(white: 0.18), Color(red: 0.12, green: 0.36, blue: 0.86)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 3) {
             ForEach(0..<barCount, id: \.self) { index in
                 Capsule()
-                    .fill(gradient)
-                    .frame(width: 3, height: max(3, CGFloat(level(at: index)) * 20))
+                    .fill(Color.white.opacity(0.88))
+                    .frame(width: 3, height: max(3, CGFloat(level(at: index)) * 18))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.linear(duration: 0.05), value: levels)
+        .animation(.easeOut(duration: 0.12), value: levels)
     }
 
     private func level(at index: Int) -> Float {

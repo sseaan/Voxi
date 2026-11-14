@@ -128,6 +128,23 @@ final class AudioFileTranscriptionModel: ObservableObject {
         notice = "已复制到剪贴板"
     }
 
+    func exportTXT() {
+        guard case .done(let text) = phase else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.plainText]
+        let base = (fileName as NSString).deletingPathExtension
+        panel.nameFieldStringValue = (base.isEmpty ? "转写结果" : base) + ".txt"
+        panel.message = "导出转写文本"
+        panel.prompt = "导出"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            notice = "已导出：\(url.lastPathComponent)"
+        } catch {
+            notice = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
     func insertResult() {
         guard case .done(let text) = phase else { return }
         let pid = targetPID
@@ -333,7 +350,14 @@ struct AudioFileTranscriptionView: View {
                 Spacer()
             }
             .padding(10)
-            .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+            )
         }
 
         switch model.phase {
@@ -393,9 +417,17 @@ struct AudioFileTranscriptionView: View {
                         .padding(10)
                 }
                 .frame(minHeight: 120)
-                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+                )
                 HStack {
                     Button("复制") { model.copyResult() }
+                    Button("导出 TXT…") { model.exportTXT() }
                     Button("插入到前台应用") { model.insertResult() }
                     Spacer()
                     Button("再转写一次") { model.retry() }

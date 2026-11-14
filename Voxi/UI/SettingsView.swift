@@ -17,33 +17,77 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        HStack(spacing: 0) {
+            sidebar
             Divider()
-            content
-            if tab == .general || tab == .text {
-                Divider()
-                footer
+            VStack(spacing: 0) {
+                pageHeader
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if tab == .general || tab == .text {
+                    Divider()
+                    footer
+                }
             }
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 720, minHeight: 560)
+        .frame(minWidth: 840, minHeight: 560)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    private var header: some View {
+    private var pageHeader: some View {
         HStack {
-            Picker("", selection: $tab) {
-                ForEach(SettingsTab.allCases) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 420)
+            Text(tab.title)
+                .font(.system(size: 20, weight: .bold))
             Spacer()
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 26)
+        .padding(.top, 24)
+        .padding(.bottom, 8)
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Spacer().frame(height: 32)
+
+            VStack(spacing: 4) {
+                Group {
+                    if let icon = NSApp.applicationIconImage {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .interpolation(.high)
+                    } else {
+                        Image(systemName: "waveform.circle.fill")
+                            .resizable()
+                            .foregroundStyle(.tint)
+                    }
+                }
+                .frame(width: 64, height: 64)
+
+                Text("Voxi")
+                    .font(.system(size: 14.5, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.82))
+                Text("版本 \(Bundle.main.shortVersion)")
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundStyle(.tertiary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 18)
+
+            ForEach(SettingsTab.allCases) { item in
+                SettingsSidebarItem(
+                    tab: item,
+                    selected: tab == item
+                ) {
+                    tab = item
+                }
+            }
+
+            Spacer()
+        }
+        .padding(10)
+        .frame(width: 184)
+        .background(.regularMaterial)
     }
 
     @ViewBuilder
@@ -209,6 +253,42 @@ struct GeneralSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             permissions.refresh()
         }
+    }
+}
+
+private struct SettingsSidebarItem: View {
+    let tab: SettingsTab
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: tab.systemImage)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        tab.iconColor.gradient,
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
+                Text(tab.title)
+                    .font(.system(size: 13))
+                    .foregroundStyle(.primary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(selected ? Color.primary.opacity(0.09)
+                          : hovering ? Color.primary.opacity(0.04) : .clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
     }
 }
 
