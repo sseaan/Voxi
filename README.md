@@ -238,6 +238,6 @@ Voxi/
 
 ## 版本与许可证
 
-当前版本 `0.1.0`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
+当前版本 `1.0.0`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
 
 个人项目，仓库暂未附开源许可证。

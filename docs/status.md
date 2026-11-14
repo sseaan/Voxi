@@ -323,3 +323,9 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 - 新增 `.github/workflows/release.yml`：推送 `v*` tag 或手动指定 tag，构建 universal Release（ad-hoc 签名），生成 zip/manifest 并上传 GitHub Release。
 - 新增 `packaging/README-FIRST-LAUNCH.txt` 发布包说明模板。
 - README 按项目类型重写，补充安装、权限、隐私、构建与架构说明。
+
+## Voxi 1.0.0 发布（2026-11-15）
+
+- MARKETING_VERSION 提升到 1.0.0。
+- 首次通过 GitHub Actions 构建 universal Release（ad-hoc 签名）并上传 GitHub Release。
+- 发布包包含 `Voxi.zip`、`manifest.txt` 和首次启动说明。
