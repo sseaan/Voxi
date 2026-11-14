@@ -72,6 +72,14 @@ final class PermissionService: ObservableObject {
         accessibilityTrusted = AXIsProcessTrusted()
     }
 
+    /// 首次调用会弹系统麦克风授权框；已决定时直接返回结果。
+    @discardableResult
+    func requestMicrophoneAccess() async -> Bool {
+        let granted = await audioPermissions.requestMicrophoneAccess()
+        refresh()
+        return granted
+    }
+
     /// 辅助功能是否已授权（自动输入需要）。
     func isAccessibilityTrusted() -> Bool {
         AXIsProcessTrusted()

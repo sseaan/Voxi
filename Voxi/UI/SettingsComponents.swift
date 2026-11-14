@@ -316,3 +316,52 @@ struct SettingsPage<Content: View>: View {
         }
     }
 }
+
+
+/// 登录时启动开关。失败时回退到系统实际状态并显示原因。
+struct LaunchAtLoginToggle: View {
+    @State private var enabled = LaunchAtLoginService.isEnabled
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Toggle("", isOn: Binding(
+                get: { enabled },
+                set: { setEnabled($0) }
+            ))
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .labelsHidden()
+
+            if let error {
+                Text(error)
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 220, alignment: .trailing)
+            } else if LaunchAtLoginService.requiresApproval {
+                Text("需在系统设置中允许")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear {
+            enabled = LaunchAtLoginService.isEnabled
+        }
+    }
+
+    private func setEnabled(_ value: Bool) {
+        error = nil
+        do {
+            try LaunchAtLoginService.set(value)
+            enabled = LaunchAtLoginService.isEnabled
+            if value && !LaunchAtLoginService.isEnabled {
+                error = "需在系统设置 → 通用 → 登录项中允许"
+            }
+        } catch {
+            enabled = LaunchAtLoginService.isEnabled
+            self.error = error.localizedDescription
+        }
+    }
+}

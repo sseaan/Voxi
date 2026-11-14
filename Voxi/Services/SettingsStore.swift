@@ -17,6 +17,8 @@ struct VoxiSettings: Codable, Equatable {
     var customStyles: [TranscriptionStyle]
     /// 通用 OpenAI Chat 配置；未配置时风格不生效。
     var languageModel: LanguageModelProfile?
+    /// 首次引导是否完成。旧配置没有这个字段时按已完成处理，避免升级后强制引导。
+    var hasCompletedOnboarding: Bool
 
     static let currentSchemaVersion = 1
 
@@ -32,7 +34,8 @@ struct VoxiSettings: Codable, Equatable {
         lexicon: PersonalLexicon = PersonalLexicon(),
         selectedStyleID: UUID? = nil,
         customStyles: [TranscriptionStyle] = [],
-        languageModel: LanguageModelProfile? = nil
+        languageModel: LanguageModelProfile? = nil,
+        hasCompletedOnboarding: Bool = false
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
@@ -46,6 +49,7 @@ struct VoxiSettings: Codable, Equatable {
         self.selectedStyleID = selectedStyleID
         self.customStyles = customStyles
         self.languageModel = languageModel
+        self.hasCompletedOnboarding = hasCompletedOnboarding
     }
 
     /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
@@ -71,7 +75,7 @@ struct VoxiSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
              textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon,
-             selectedStyleID, customStyles, languageModel
+             selectedStyleID, customStyles, languageModel, hasCompletedOnboarding
     }
 
     /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
@@ -96,6 +100,10 @@ struct VoxiSettings: Codable, Equatable {
         selectedStyleID = try container.decodeIfPresent(UUID.self, forKey: .selectedStyleID)
         customStyles = try container.decodeIfPresent([TranscriptionStyle].self, forKey: .customStyles) ?? []
         languageModel = try container.decodeIfPresent(LanguageModelProfile.self, forKey: .languageModel)
+        hasCompletedOnboarding = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .hasCompletedOnboarding
+        ) ?? true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -112,6 +120,7 @@ struct VoxiSettings: Codable, Equatable {
         try container.encodeIfPresent(selectedStyleID, forKey: .selectedStyleID)
         try container.encode(customStyles, forKey: .customStyles)
         try container.encodeIfPresent(languageModel, forKey: .languageModel)
+        try container.encode(hasCompletedOnboarding, forKey: .hasCompletedOnboarding)
     }
 }
 

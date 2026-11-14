@@ -73,7 +73,7 @@ final class RecordingStateTests: XCTestCase {
 final class ShortcutConfigurationTests: XCTestCase {
     func testDefaultIsValid() {
         XCTAssertTrue(ShortcutConfiguration.default.isValid)
-        XCTAssertEqual(ShortcutConfiguration.default.displayString, "⌃⌥Space")
+        XCTAssertEqual(ShortcutConfiguration.default.displayString, "右 ⌥")
     }
 
     func testModifierOnlyConfigurationIsInvalid() {

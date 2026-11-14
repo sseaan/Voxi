@@ -1035,7 +1035,7 @@ private struct LanguageModelEditorSheet: View {
     }
 }
 
-private struct EndpointEditorSheet: View {
+struct EndpointEditorSheet: View {
     @State private var draft: EndpointProfile
     private let isNew: Bool
     private let isActive: Bool

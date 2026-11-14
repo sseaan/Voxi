@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator!
     private var statusItem: StatusItemController!
     private var recordingIndicator: RecordingIndicatorController!
+    private var onboarding: OnboardingWindowController?
     private let menuActions = AppMenuActions()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -33,6 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menuActions.configure(settings: settings, appState: state, coordinator: coordinator)
         MainMenuBuilder.install(actions: menuActions)
         coordinator.activate()
+
+        if !settings.settings.hasCompletedOnboarding {
+            let onboarding = OnboardingWindowController(settings: settings, coordinator: coordinator)
+            self.onboarding = onboarding
+            onboarding.show()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

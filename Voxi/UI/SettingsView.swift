@@ -7,6 +7,7 @@ struct SettingsView: View {
     @ObservedObject var coordinator: AppCoordinator
 
     @State private var tab: SettingsTab = .general
+    @State private var onboardingController: OnboardingWindowController?
 
     init(settings: SettingsStore, appState: AppState, coordinator: AppCoordinator) {
         self.settings = settings
@@ -82,7 +83,15 @@ struct SettingsView: View {
         case .lexicon:
             LexiconView(settings: settings)
         case .about:
-            AboutSettingsView()
+            AboutSettingsView {
+                settings.settings.hasCompletedOnboarding = false
+                let controller = OnboardingWindowController(
+                    settings: settings,
+                    coordinator: coordinator
+                )
+                onboardingController = controller
+                controller.show()
+            }
         }
     }
 
@@ -131,6 +140,13 @@ struct GeneralSettingsView: View {
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .labelsHidden()
+                }
+                SettingsDivider()
+                SettingsFieldRow(
+                    "登录时启动",
+                    subtitle: "开机后自动在菜单栏运行"
+                ) {
+                    LaunchAtLoginToggle()
                 }
             }
 
@@ -247,6 +263,8 @@ private struct SettingsSidebarItem: View {
 }
 
 struct AboutSettingsView: View {
+    var onRunOnboarding: () -> Void = {}
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -291,6 +309,11 @@ struct AboutSettingsView: View {
             Text("自签名构建，不经过 Apple notarization。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Button("重新运行首次引导…") {
+                onRunOnboarding()
+            }
+            .controlSize(.small)
+            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 30)

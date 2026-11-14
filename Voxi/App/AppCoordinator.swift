@@ -34,6 +34,8 @@ final class AppCoordinator: ObservableObject {
     private var isActivated = false
     /// 快捷键当前是否按下；用于识别“权限弹窗期间松开”的情况。
     private var isShortcutDown = false
+    /// 单键快捷键因辅助功能未授权而注册失败；授权后回到前台自动重试。
+    private var shortcutRegistrationNeedsAccessibility = false
     /// 本次 session 是否由“按住快捷键”触发（菜单/API 触发不受松键保护影响）。
     private var startedWithShortcutHeld = false
     private var capturedByteCount = 0
@@ -93,6 +95,16 @@ final class AppCoordinator: ObservableObject {
             .removeDuplicates()
             .sink { [weak self] shortcut in
                 self?.applyShortcut(shortcut)
+            }
+            .store(in: &cancellables)
+
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                guard let self,
+                      self.shortcutRegistrationNeedsAccessibility,
+                      self.permissions.isAccessibilityTrusted()
+                else { return }
+                self.applyShortcut(self.settings.settings.shortcut)
             }
             .store(in: &cancellables)
 
@@ -166,7 +178,14 @@ final class AppCoordinator: ObservableObject {
     private func applyShortcut(_ shortcut: ShortcutConfiguration) {
         do {
             try shortcutService.register(shortcut)
+            shortcutRegistrationNeedsAccessibility = false
+        } catch let error as ShortcutService.RegistrationError
+            where error == .accessibilityRequired {
+            // 首次启动还没有辅助功能权限：不报错，等引导授权后回到前台自动重试。
+            shortcutRegistrationNeedsAccessibility = true
+            Logger.shortcut.info("快捷键等待辅助功能授权: \(shortcut.displayString, privacy: .public)")
         } catch {
+            shortcutRegistrationNeedsAccessibility = false
             Logger.shortcut.error("快捷键注册失败: \(String(describing: error), privacy: .public)")
             appState.present(error: AppError(
                 message: error.localizedDescription + " 请到设置中更换快捷键。"

@@ -22,9 +22,10 @@ struct ShortcutConfiguration: Codable, Equatable {
         carbonModifiers == 0 && (keyCode == Self.fnKeyCode || keyCode == Self.rightOptionKeyCode)
     }
 
+    /// 新安装默认右 Option 单键；老用户已保存的快捷键不受影响。
     static let `default` = ShortcutConfiguration(
-        keyCode: 0x31, // kVK_Space
-        carbonModifiers: Modifier.control.rawValue | Modifier.option.rawValue
+        keyCode: rightOptionKeyCode,
+        carbonModifiers: 0
     )
 
     init(keyCode: UInt32, carbonModifiers: UInt32) {

@@ -241,4 +241,25 @@ final class EndpointProfileValidationTests: XCTestCase {
         XCTAssertEqual(profile.volcengine.resultType, .full)
         XCTAssertFalse(profile.volcengine.sendsApiSequenceHeader)
     }
+
+    func testOnboardingFlagDefaultsIncompleteAndLegacySettingsAreComplete() throws {
+        XCTAssertFalse(VoxiSettings().hasCompletedOnboarding)
+
+        let encoded = try JSONEncoder().encode(VoxiSettings())
+        var object = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        object.removeValue(forKey: "hasCompletedOnboarding")
+        let legacyData = try JSONSerialization.data(withJSONObject: object)
+        let legacy = try JSONDecoder().decode(VoxiSettings.self, from: legacyData)
+        XCTAssertTrue(legacy.hasCompletedOnboarding, "旧配置升级后不强制重新引导")
+
+        var completed = VoxiSettings()
+        completed.hasCompletedOnboarding = true
+        let roundTrip = try JSONDecoder().decode(
+            VoxiSettings.self,
+            from: JSONEncoder().encode(completed)
+        )
+        XCTAssertTrue(roundTrip.hasCompletedOnboarding)
+    }
 }
