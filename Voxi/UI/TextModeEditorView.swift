@@ -25,7 +25,7 @@ struct TextModeEditorView: View {
         SettingsPage(title: "风格") {
             SettingsCard(
                 "转写风格",
-                footer: "风格会在识别完成后调用语言模型整理；选择「原文」则直接使用识别结果。"
+                footer: "风格指令由语言模型执行；语音识别模型只负责转写。选择「原文」则直接使用识别结果。"
             ) {
                 LazyVGrid(columns: columns, spacing: 10) {
                     ForEach(TranscriptionStyle.builtIns) { style in
@@ -198,14 +198,25 @@ struct TextModeEditorView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(selected ? Color.accentColor : Color.secondary.opacity(0.4))
                     }
-                    Text(isCustom ? style.prompt : style.detail)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(isCustom ? "提示词" : "效果示例")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.tertiary)
+                        Text(isCustom ? style.prompt : (style.example ?? style.detail))
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.primary.opacity(0.82))
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(7)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        Color.primary.opacity(0.04),
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
                 }
                 .padding(10)
-                .frame(maxWidth: .infinity, minHeight: 84, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -290,6 +301,10 @@ private struct CustomStyleSheet: View {
                     }
                 }
             }
+
+            Text("提示词会作为系统指令发送给语言模型；语音识别模型只负责转写。")
+                .font(.system(size: 11))
+                .foregroundStyle(.tertiary)
 
             HStack {
                 Spacer()

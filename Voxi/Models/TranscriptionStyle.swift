@@ -17,6 +17,8 @@ struct TranscriptionStyle: Identifiable, Codable, Equatable {
     var name: String
     var detail: String
     var prompt: String
+    /// 卡片中展示的效果示例；旧自定义风格没有这个字段。
+    var example: String? = nil
 
     var requiresLLM: Bool { kind != .raw }
 
@@ -35,7 +37,8 @@ struct TranscriptionStyle: Identifiable, Codable, Equatable {
         kind: .raw,
         name: "原文",
         detail: "直接使用识别结果，不调用语言模型。",
-        prompt: ""
+        prompt: "",
+        example: "呃，那个，我们明天下午三点开个会，然后聊一下新版本上线的事儿。"
     )
 
     static let simple = TranscriptionStyle(
@@ -45,7 +48,8 @@ struct TranscriptionStyle: Identifiable, Codable, Equatable {
         detail: "补全标点、去掉口头禅，保留原话。",
         prompt: """
         你是一个语音转写整理助手。整理用户提供的语音转写文本：补全标点、按语义分段，删除口头禅、重复词和明显的语气词；保留原意和原有措辞，不要总结，不要添加原文没有的信息。只输出整理后的文本，不要解释。
-        """
+        """,
+        example: "我们明天下午三点开个会，聊一下新版本上线的事。"
     )
 
     static let structured = TranscriptionStyle(
@@ -55,7 +59,8 @@ struct TranscriptionStyle: Identifiable, Codable, Equatable {
         detail: "按语义分段，要点自动整理成列表。",
         prompt: """
         你是一个语音转写整理助手。将用户提供的语音转写文本整理成清晰的结构：补全标点，按语义分段；如果内容包含多个并列要点，使用以「- 」开头的简洁列表，否则使用自然段落。保留原意和事实，不要添加原文没有的信息。只输出整理后的文本，不要解释。
-        """
+        """,
+        example: "- 时间：明天下午三点\n- 议题：新版本上线计划"
     )
 
     static let formal = TranscriptionStyle(
@@ -65,7 +70,8 @@ struct TranscriptionStyle: Identifiable, Codable, Equatable {
         detail: "改写为正式、专业的书面表达。",
         prompt: """
         你是一个语音转写润色助手。将用户提供的语音转写文本改写为正式、专业、简洁的书面表达：补全标点并分段，去除口语化表达、口头禅和重复；保留事实和原意，不添加新信息，不要总结。只输出改写后的文本，不要解释。
-        """
+        """,
+        example: "拟定于明日十五时召开会议，讨论新版本上线计划。"
     )
 
     static let builtIns: [TranscriptionStyle] = [.raw, .simple, .structured, .formal]
