@@ -97,6 +97,36 @@ final class ChatCompletionServiceTests: XCTestCase {
         XCTAssertTrue(body.contains("\"stream\":false"))
     }
 
+    func testOpenCodeGoUsesDedicatedEndpointAndHeaders() async throws {
+        let keyID = UUID()
+        var profile = LanguageModelProfile(kind: .openCodeGo)
+        profile.model = "deepseek-v4.1-flash"
+        profile.apiKeyItemID = keyID
+        ChatStubURLProtocol.handler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (response, Data(#"{"choices":[{"message":{"content":"go 结果"}}]}"#.utf8))
+        }
+        let service = ChatCompletionService(
+            urlSession: ChatStubURLProtocol.makeSession(),
+            secretResolver: InMemorySecretResolver([keyID: "go-key"])
+        )
+        let result = try await service.complete(profile: profile, systemPrompt: "s", userText: "u")
+        XCTAssertEqual(result, "go 结果")
+
+        let request = try XCTUnwrap(ChatStubURLProtocol.requests.first)
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://opencode.ai/inference/go/openai/v1/chat/completions"
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer go-key")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-opencode-session"), profile.id.uuidString)
+        XCTAssertNotNil(request.value(forHTTPHeaderField: "x-opencode-request"))
+        let body = String(decoding: ChatStubURLProtocol.body(of: request), as: UTF8.self)
+        XCTAssertTrue(body.contains("max_tokens"))
+        XCTAssertFalse(body.contains("temperature"))
+        XCTAssertTrue(body.contains("deepseek-v4.1-flash"))
+    }
+
     func testNoneAuthOmitsAuthorization() async throws {
         var (profile, _) = makeProfile()
         profile.authMode = .none

@@ -135,9 +135,13 @@ struct EndpointListView: View {
                             : EndpointProfile.defaultVolcengineProfile()
                         profile.name = kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包"
                         editing = EditingProfile(profile: profile, isNew: true)
-                    case .languageModel:
-                        editingLanguageModel = settings.settings.languageModel
-                            ?? LanguageModelProfile()
+                    case .languageModel(let kind):
+                        if let existing = settings.settings.languageModel,
+                           existing.providerKind == kind {
+                            editingLanguageModel = existing
+                        } else {
+                            editingLanguageModel = LanguageModelProfile.defaultProfile(for: kind)
+                        }
                     }
                 }
             }
@@ -353,7 +357,7 @@ struct EndpointListView: View {
                 Text(model)
                     .font(.system(size: 13))
                 Spacer()
-                Text("通用 OpenAI")
+                Text(profile.providerDisplayName)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                 if model == profile.model {
@@ -438,15 +442,15 @@ struct EndpointListView: View {
 
     private func languageModelRow(_ model: LanguageModelProfile) -> some View {
         HStack(spacing: 10) {
-            LanguageModelBadge()
+            LanguageModelBadge(kind: model.providerKind)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text(model.name.isEmpty ? "通用 OpenAI" : model.name)
+                    Text(model.name.isEmpty ? model.providerDisplayName : model.name)
                         .font(.system(size: 13))
                         .lineLimit(1)
                     CapabilityTag(text: "语言模型", color: Color(red: 0.20, green: 0.68, blue: 0.48))
                 }
-                Text("通用 OpenAI · \(model.model)")
+                Text("\(model.providerDisplayName) · \(model.model)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -545,7 +549,7 @@ private struct ProviderBadge: View {
 
 private enum ProviderChoice: Equatable {
     case asr(EndpointProfile.ProviderKind)
-    case languageModel
+    case languageModel(LanguageModelProfile.Kind)
 }
 
 private struct CapabilityTag: View {
@@ -563,21 +567,33 @@ private struct CapabilityTag: View {
 }
 
 private struct LanguageModelBadge: View {
+    var kind: LanguageModelProfile.Kind = .openAICompatible
     var size: CGFloat = 26
 
     var body: some View {
-        Image(systemName: "brain")
+        Image(systemName: kind == .openCodeGo ? "terminal.fill" : "brain")
             .font(.system(size: size * 0.42, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
             .background(
-                LinearGradient(
-                    colors: [Color(red: 0.22, green: 0.74, blue: 0.54), Color(red: 0.10, green: 0.55, blue: 0.42)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                ),
+                gradient,
                 in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
             )
+    }
+
+    private var gradient: LinearGradient {
+        if kind == .openCodeGo {
+            return LinearGradient(
+                colors: [Color(red: 0.20, green: 0.60, blue: 0.98), Color(red: 0.12, green: 0.36, blue: 0.88)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        return LinearGradient(
+            colors: [Color(red: 0.22, green: 0.74, blue: 0.54), Color(red: 0.10, green: 0.55, blue: 0.42)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 
@@ -603,7 +619,10 @@ private struct ProviderPickerSheet: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
-            languageModelCard
+            HStack(spacing: 10) {
+                languageModelCard(.openAICompatible)
+                languageModelCard(.openCodeGo)
+            }
 
             Text(detail)
                 .font(.system(size: 12))
@@ -629,7 +648,10 @@ private struct ProviderPickerSheet: View {
         switch selected {
         case .asr(let kind):
             return kind.summary
-        case .languageModel:
+        case .languageModel(let kind):
+            if kind == .openCodeGo {
+                return "OpenCode Go 专用端点（/inference/go/openai/v1），自动附带 OpenCode 会话头并使用 Chat Completions 格式。"
+            }
             return "配置 OpenAI-compatible Chat Completions，用于在识别完成后按所选风格整理文本。与语音识别来源分开保存。"
         }
     }
@@ -671,18 +693,18 @@ private struct ProviderPickerSheet: View {
         .buttonStyle(.plain)
     }
 
-    private var languageModelCard: some View {
-        let isSelected = selected == .languageModel
+    private func languageModelCard(_ kind: LanguageModelProfile.Kind) -> some View {
+        let isSelected = selected == .languageModel(kind)
         return Button {
-            selected = .languageModel
+            selected = .languageModel(kind)
         } label: {
             HStack(spacing: 10) {
-                LanguageModelBadge(size: 28)
+                LanguageModelBadge(kind: kind, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("通用 OpenAI 接入")
+                    Text(kind == .openCodeGo ? "OpenCode Go" : "通用 OpenAI 接入")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.primary)
-                    Text("Chat Completions · 用于风格整理")
+                    Text(kind == .openCodeGo ? "Go 专用网关" : "Chat Completions")
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
                 }
@@ -692,7 +714,7 @@ private struct ProviderPickerSheet: View {
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.45))
             }
             .padding(.horizontal, 13)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
             .background(
                 isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor),
                 in: RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -734,7 +756,7 @@ private struct LanguageModelEditorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(draft.apiKeyItemID == nil ? "添加通用 OpenAI 接入" : "编辑通用 OpenAI 接入")
+                Text("\(draft.apiKeyItemID == nil ? "添加" : "编辑") \(draft.providerDisplayName)")
                     .font(.system(size: 18, weight: .semibold))
                 Spacer()
                 Button("取消") { onCancel() }
@@ -748,21 +770,76 @@ private struct LanguageModelEditorSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     SettingsListCard(
                         "连接",
-                        footer: "Endpoint 可填完整的 /chat/completions，也可只填到 /v1，Voxi 会自动补全。"
+                        footer: draft.providerKind == .openCodeGo
+                            ? "OpenCode Go 使用专用网关与 x-opencode-session 会话头。"
+                            : "Endpoint 可填完整的 /chat/completions，也可只填到 /v1，Voxi 会自动补全。"
                     ) {
+                        SettingsFieldRow("服务类型") {
+                            Picker("", selection: Binding(
+                                get: { draft.providerKind },
+                                set: { newKind in
+                                    guard newKind != draft.providerKind else { return }
+                                    draft.kind = newKind
+                                    draft.endpointURL = newKind.defaultEndpoint
+                                    draft.enabledModels = nil
+                                    if newKind == .openCodeGo {
+                                        if draft.name.isEmpty || draft.name == "通用 OpenAI" {
+                                            draft.name = "OpenCode Go"
+                                        }
+                                        if draft.model.isEmpty || draft.model == "gpt-4o-mini" {
+                                            draft.model = newKind.defaultModel
+                                        }
+                                    } else {
+                                        if draft.name == "OpenCode Go" {
+                                            draft.name = "通用 OpenAI"
+                                        }
+                                        if draft.model == "deepseek-v4.1-flash" {
+                                            draft.model = newKind.defaultModel
+                                        }
+                                    }
+                                }
+                            )) {
+                                ForEach(LanguageModelProfile.Kind.allCases) { kind in
+                                    Text(kind.displayName).tag(kind)
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        if draft.providerKind == .openAICompatible,
+                           draft.endpointURL.contains("opencode.ai") {
+                            SettingsDivider()
+                            Text("检测到 OpenCode 地址。如果使用 OpenCode Go，请把上面的服务类型切换为 OpenCode Go。")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                        }
+                        SettingsDivider()
                         SettingsFieldRow("名称") {
                             TextField("通用 OpenAI", text: $draft.name)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 240)
                         }
                         SettingsDivider()
-                        SettingsFieldRow("Endpoint") {
-                            TextField(
-                                "https://api.openai.com/v1/chat/completions",
-                                text: $draft.endpointURL
-                            )
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12, design: .monospaced))
+                        if draft.providerKind == .openAICompatible {
+                            SettingsFieldRow("Endpoint") {
+                                TextField(
+                                    "https://api.openai.com/v1/chat/completions",
+                                    text: $draft.endpointURL
+                                )
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 12, design: .monospaced))
+                            }
+                        } else {
+                            SettingsFieldRow("Endpoint", subtitle: "OpenCode Go 专用，不可修改") {
+                                Text("https://opencode.ai/inference/go/openai/v1/chat/completions")
+                                    .font(.system(size: 10.5, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+                            }
                         }
                         SettingsDivider()
                         SettingsFieldRow(
@@ -936,6 +1013,10 @@ private struct LanguageModelEditorSheet: View {
     private func save() {
         message = nil
         var profile = draft
+        profile.kind = profile.providerKind
+        if profile.providerKind == .openCodeGo {
+            profile.endpointURL = LanguageModelProfile.Kind.openCodeGo.defaultEndpoint
+        }
         do {
             if !apiKeyInput.isEmpty {
                 profile.apiKeyItemID = try keychain.store(

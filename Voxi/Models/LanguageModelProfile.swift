@@ -3,6 +3,36 @@ import Foundation
 /// 通用 OpenAI-compatible Chat Completions 配置，用于转写后的风格整理。
 /// 与语音识别端点分开保存；API Key 只存 Keychain item 引用。
 struct LanguageModelProfile: Identifiable, Codable, Equatable {
+    enum Kind: String, Codable, CaseIterable, Identifiable {
+        case openAICompatible
+        case openCodeGo
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .openAICompatible: return "通用 OpenAI"
+            case .openCodeGo: return "OpenCode Go"
+            }
+        }
+
+        var defaultEndpoint: String {
+            switch self {
+            case .openAICompatible:
+                return "https://api.openai.com/v1/chat/completions"
+            case .openCodeGo:
+                return "https://opencode.ai/inference/go/openai/v1/chat/completions"
+            }
+        }
+
+        var defaultModel: String {
+            switch self {
+            case .openAICompatible: return "gpt-4o-mini"
+            case .openCodeGo: return "deepseek-v4.1-flash"
+            }
+        }
+    }
+
     enum AuthMode: String, Codable, CaseIterable, Identifiable {
         case bearer
         case none
@@ -18,6 +48,8 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
     }
 
     var id: UUID
+    /// 旧配置没有这个字段时按通用 OpenAI 处理。
+    var kind: Kind? = nil
     var name: String
     var endpointURL: String
     var model: String
@@ -30,18 +62,20 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
 
     init(
         id: UUID = UUID(),
-        name: String = "通用 OpenAI",
-        endpointURL: String = "https://api.openai.com/v1/chat/completions",
-        model: String = "gpt-4o-mini",
+        kind: Kind = .openAICompatible,
+        name: String? = nil,
+        endpointURL: String? = nil,
+        model: String? = nil,
         authMode: AuthMode = .bearer,
         apiKeyItemID: UUID? = nil,
         timeoutSeconds: Double = 60,
         temperature: Double = 0.3
     ) {
         self.id = id
-        self.name = name
-        self.endpointURL = endpointURL
-        self.model = model
+        self.kind = kind
+        self.name = name ?? (kind == .openCodeGo ? "OpenCode Go" : "通用 OpenAI")
+        self.endpointURL = endpointURL ?? kind.defaultEndpoint
+        self.model = model ?? kind.defaultModel
         self.authMode = authMode
         self.apiKeyItemID = apiKeyItemID
         self.timeoutSeconds = timeoutSeconds
@@ -61,8 +95,19 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
         return manual.isEmpty ? [] : [manual]
     }
 
+    var providerKind: Kind { kind ?? .openAICompatible }
+
+    var providerDisplayName: String { providerKind.displayName }
+
+    static func defaultProfile(for kind: Kind) -> LanguageModelProfile {
+        LanguageModelProfile(kind: kind)
+    }
+
     /// 允许填完整 `/chat/completions`，也允许只填到 `/v1`。
     var chatCompletionsURL: URL? {
+        if providerKind == .openCodeGo {
+            return URL(string: "https://opencode.ai/inference/go/openai/v1/chat/completions")
+        }
         var raw = endpointURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !raw.isEmpty else { return nil }
         while raw.hasSuffix("/") { raw.removeLast() }
@@ -76,6 +121,15 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
             if host == "localhost" || host == "127.0.0.1" || host == "::1" { return url }
         }
         return nil
+    }
+
+    /// OpenCode Go 的模型列表地址与 Chat 地址不同。
+    var modelsURL: URL? {
+        if providerKind == .openCodeGo {
+            return URL(string: "https://opencode.ai/inference/go/v1/models")
+        }
+        guard let endpoint = URL(string: endpointURL) else { return nil }
+        return ProviderModelsService.modelsURL(from: endpoint)
     }
 
     func validation() -> String? {

@@ -70,13 +70,17 @@ struct ProviderModelsService {
         profile: LanguageModelProfile,
         apiKeyInput: String?
     ) async throws -> [String] {
-        guard let endpoint = URL(string: profile.endpointURL) else {
-            throw ProviderModelsError.invalidEndpoint
-        }
-        guard let modelsURL = Self.modelsURL(from: endpoint) else {
+        guard let modelsURL = profile.modelsURL else {
             throw ProviderModelsError.invalidEndpoint
         }
         var headers: [String: String] = [:]
+        if profile.providerKind == .openCodeGo {
+            headers["User-Agent"] = "Voxi/0.1.0 (macOS)"
+            headers["x-opencode-client"] = "voxi"
+            headers["x-opencode-session"] = profile.id.uuidString
+            headers["x-opencode-request"] = UUID().uuidString
+            headers["x-opencode-project"] = "default"
+        }
         if profile.authMode == .bearer {
             let key = try await resolveKey(input: apiKeyInput, itemID: profile.apiKeyItemID)
             headers["Authorization"] = "Bearer \(key)"

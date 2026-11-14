@@ -281,3 +281,16 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
    - 运行时候选 = 来源顺序 × 模型顺序；录音/文件回退都按此链执行。
 3. **兼容**
    - `enabledModels` 为可选字段，旧配置无此字段时回落到原来的单模型。
+
+## 第十一轮：OpenCode Go 专用适配（2026-11-15）
+
+- OpenCode 的 OpenAI 兼容地址与通用 OpenAI 不同，旧地址 `.../inference/openai/v1/chat/completions` 会在 Go 上返回 400。
+- 新增语言模型类型 `OpenCode Go`：
+  - Chat：`https://opencode.ai/inference/go/openai/v1/chat/completions`
+  - Models：`https://opencode.ai/inference/go/v1/models`
+  - 请求头：`x-opencode-session`（稳定会话）、`x-opencode-request`、`x-opencode-client`、`x-opencode-project`、`User-Agent`。
+  - 请求体：OpenAI Chat Completions + `max_tokens`，**不发送 temperature**（避免推理模型 400）。
+  - 400/500 无明确错误体时自动重试一次；400 文案提示“请求格式或模型参数不被接受”。
+- 添加来源的“语言模型”分组现在有「通用 OpenAI 接入」和「OpenCode Go」两张卡片。
+- 语言模型编辑页新增“服务类型”Picker；切到 OpenCode Go 会自动填入专用 Endpoint、隐藏手工 Endpoint，并保留原 API Key。
+- 旧配置没有 kind 字段时仍按通用 OpenAI 处理；在编辑器里切换服务类型即可迁移。

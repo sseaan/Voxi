@@ -1,7 +1,7 @@
 import Foundation
 
-/// 通用 OpenAI-compatible Chat Completions 客户端。
-/// 只承担“把一段文字按提示词整理”的职责，不做流式、不重试。
+/// 通用 OpenAI-compatible / OpenCode Go Chat Completions 客户端。
+/// 只承担“把一段文字按提示词整理”的职责，不做流式；OpenCode Go 的 400/500 会重试一次。
 struct ChatCompletionService {
     var urlSession: URLSession = .shared
     var secretResolver: SecretResolving = KeychainSecretResolver()
@@ -19,6 +19,7 @@ struct ChatCompletionService {
             case .http(let status, let message):
                 let hint: String
                 switch status {
+                case 400: hint = "请求格式或模型参数不被接受"
                 case 401: hint = "API Key 无效或无权限"
                 case 402: hint = "账户余额不足或额度用尽"
                 case 403: hint = "无权访问该模型"
@@ -44,6 +45,14 @@ struct ChatCompletionService {
         if let message = profile.validation() {
             throw ChatError.invalidConfiguration(message)
         }
+        if profile.providerKind == .openCodeGo {
+            return try await completeOpenCodeGo(
+                profile: profile,
+                systemPrompt: systemPrompt,
+                userText: userText
+            )
+        }
+
         guard let url = profile.chatCompletionsURL else {
             throw ChatError.invalidConfiguration("Chat Completions 地址无效。")
         }
@@ -78,7 +87,73 @@ struct ChatCompletionService {
 
         let (data, response) = try await urlSession.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        return try decode(data: data, status: status)
+    }
 
+    /// OpenCode Go 有独立的网关：固定 Chat 地址、CLI 会话头、无 temperature。
+    /// 官方 400 偶发且无错误体，这里对 400/500 自动重试一次。
+    private func completeOpenCodeGo(
+        profile: LanguageModelProfile,
+        systemPrompt: String,
+        userText: String
+    ) async throws -> String {
+        guard let url = profile.chatCompletionsURL else {
+            throw ChatError.invalidConfiguration("OpenCode Go 地址无效。")
+        }
+        var secret: String?
+        if profile.authMode == .bearer {
+            guard let itemID = profile.apiKeyItemID else {
+                throw ChatError.invalidConfiguration("缺少 API Key。")
+            }
+            secret = try await SecretReader.secret(secretResolver, for: itemID)
+        }
+
+        let maxTokens = max(1024, min(8192, (systemPrompt.count + userText.count) * 2))
+        let payload = GoRequestPayload(
+            model: profile.model.trimmingCharacters(in: .whitespacesAndNewlines),
+            messages: [
+                .init(role: "system", content: systemPrompt),
+                .init(role: "user", content: userText)
+            ],
+            stream: false,
+            maxTokens: maxTokens
+        )
+
+        func makeRequest() throws -> URLRequest {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = profile.timeoutSeconds
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("Voxi/0.1.0 (macOS)", forHTTPHeaderField: "User-Agent")
+            request.setValue("voxi", forHTTPHeaderField: "x-opencode-client")
+            request.setValue(profile.id.uuidString, forHTTPHeaderField: "x-opencode-session")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "x-opencode-request")
+            request.setValue("default", forHTTPHeaderField: "x-opencode-project")
+            if let secret, !secret.isEmpty {
+                request.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+            }
+            request.httpBody = try JSONEncoder().encode(payload)
+            return request
+        }
+
+        var lastData = Data()
+        var lastStatus = 0
+        for attempt in 0..<2 {
+            let (data, response) = try await urlSession.data(for: try makeRequest())
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            lastData = data
+            lastStatus = status
+            if (status == 400 || status == 500), attempt == 0 {
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                continue
+            }
+            return try decode(data: data, status: status)
+        }
+        return try decode(data: lastData, status: lastStatus)
+    }
+
+    private func decode(data: Data, status: Int) throws -> String {
         let decoded = try? JSONDecoder().decode(ResponsePayload.self, from: data)
         guard (200...299).contains(status) else {
             let message = decoded?.error?.message
@@ -121,6 +196,23 @@ struct ChatCompletionService {
         let messages: [Message]
         let temperature: Double
         let stream: Bool
+    }
+
+    private struct GoRequestPayload: Encodable {
+        struct Message: Encodable {
+            let role: String
+            let content: String
+        }
+
+        let model: String
+        let messages: [Message]
+        let stream: Bool
+        let maxTokens: Int
+
+        enum CodingKeys: String, CodingKey {
+            case model, messages, stream
+            case maxTokens = "max_tokens"
+        }
     }
 
     private struct ResponsePayload: Decodable {
