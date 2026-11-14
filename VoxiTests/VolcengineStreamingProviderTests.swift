@@ -14,16 +14,24 @@ final class FakeVolcengineTransport: VolcengineWebSocketTransport {
 
     var connectError: Error?
     var sendError: Error?
+    var connectDelayNanoseconds: UInt64 = 0
+    var sendDelayNanoseconds: UInt64 = 0
     var logID: String? = "test-logid-1"
     var onSend: ((Data) -> Void)?
 
     func connect(request: URLRequest) async throws {
         connectCount += 1
+        if connectDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: connectDelayNanoseconds)
+        }
         if let connectError { throw connectError }
         connectedRequest = request
     }
 
     func send(_ data: Data) async throws {
+        if sendDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: sendDelayNanoseconds)
+        }
         if let sendError { throw sendError }
         sentFrames.append(data)
         onSend?(data)
@@ -336,6 +344,23 @@ final class VolcengineStreamingProviderTests: XCTestCase {
         } catch {
             XCTFail("错误类型不正确：\(error)")
         }
+    }
+
+    func testSlowHandshakeTimesOutInsteadOfHanging() async {
+        let transport = FakeVolcengineTransport()
+        transport.connectDelayNanoseconds = 3_000_000_000
+        let provider = makeProvider(transport: transport, secrets: [keyID: "k"], initTimeout: 0.2)
+        let started = Date()
+        do {
+            _ = try await makeSession(provider, profile: makeProfile())
+            XCTFail("握手超时应报错")
+        } catch let error as TranscriptionError {
+            XCTAssertEqual(error, .timeout)
+        } catch {
+            XCTFail("错误类型不正确：\(error)")
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2, "必须在超时后尽快返回")
+        XCTAssertTrue(transport.isClosed)
     }
 
     func testConnectFailureIsMapped() async {

@@ -34,7 +34,7 @@ final class VolcengineStreamingProvider: TranscriptionProvider {
             throw TranscriptionError.invalidConfiguration("火山 endpoint URL 无效。")
         }
 
-        let credentials = try resolveCredentials(profile: profile)
+        let credentials = try await resolveCredentials(profile: profile)
         let connectID = UUID()
         let requestID = UUID()
         let headers = VolcengineRequestBuilder.headers(
@@ -72,19 +72,19 @@ final class VolcengineStreamingProvider: TranscriptionProvider {
         return session
     }
 
-    private func resolveCredentials(profile: EndpointProfile) throws -> VolcengineRequestBuilder.Credentials {
+    private func resolveCredentials(profile: EndpointProfile) async throws -> VolcengineRequestBuilder.Credentials {
         switch profile.volcengine.authMode {
         case .apiKey:
             guard let id = profile.apiKeyItemID else { throw TranscriptionError.missingCredential }
-            return .init(apiKey: try secretResolver.secret(for: id), appKey: nil, accessKey: nil)
+            return .init(apiKey: try await SecretReader.secret(secretResolver, for: id), appKey: nil, accessKey: nil)
         case .legacy:
             guard let appID = profile.appKeyItemID, let accessID = profile.accessKeyItemID else {
                 throw TranscriptionError.missingCredential
             }
             return .init(
                 apiKey: nil,
-                appKey: try secretResolver.secret(for: appID),
-                accessKey: try secretResolver.secret(for: accessID)
+                appKey: try await SecretReader.secret(secretResolver, for: appID),
+                accessKey: try await SecretReader.secret(secretResolver, for: accessID)
             )
         }
     }
@@ -215,16 +215,32 @@ final class VolcengineStreamingSession: TranscriptionSession {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
+        // 某些网络/系统状态下 WebSocket 握手或首包发送可能长时间挂起。
+        // 注意不能使用 task group：作用域退出时会等待未响应取消的子任务，
+        // 导致超时永远不返回。这里用“先完成者生效”的竞速。
         do {
-            try await transport.connect(request: request)
+            let transport = self.transport
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let once = Self.OnceResume(continuation)
+                Task.detached {
+                    do {
+                        try await transport.connect(request: request)
+                        let frame = try VolcengineFrameEncoder.fullClientRequest(json: initializationJSON)
+                        try await transport.send(frame)
+                        once.resume(.success(()))
+                    } catch {
+                        once.resume(.failure(error))
+                    }
+                }
+                Task.detached {
+                    try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                    once.resume(.failure(TranscriptionError.timeout))
+                    // 超时后主动断开，帮助挂起的 send/receive 退出。
+                    transport.close()
+                }
+            }
         } catch {
-            throw Self.mapTransportError(error)
-        }
-
-        do {
-            let frame = try VolcengineFrameEncoder.fullClientRequest(json: initializationJSON)
-            try await transport.send(frame)
-        } catch {
+            transport.close()
             throw Self.mapTransportError(error)
         }
 
@@ -502,6 +518,28 @@ final class VolcengineStreamingSession: TranscriptionSession {
     private func resumePendingContinuations(with error: Error) {
         resumeReady(with: error)
         resumeFinal(with: error)
+    }
+
+    /// 只允许第一个结果生效，避免竞速双方重复 resume。
+    final class OnceResume: @unchecked Sendable {
+        private let lock = NSLock()
+        private var didResume = false
+        private let continuation: CheckedContinuation<Void, Error>
+
+        init(_ continuation: CheckedContinuation<Void, Error>) {
+            self.continuation = continuation
+        }
+
+        func resume(_ result: Result<Void, Error>) {
+            lock.lock()
+            guard !didResume else {
+                lock.unlock()
+                return
+            }
+            didResume = true
+            lock.unlock()
+            continuation.resume(with: result)
+        }
     }
 
     static func mapTransportError(_ error: Error) -> Error {

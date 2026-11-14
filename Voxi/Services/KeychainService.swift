@@ -19,7 +19,7 @@ enum KeychainError: Error, LocalizedError, Equatable {
 }
 
 /// Keychain 中 secret 的读写。UserDefaults 只保存 item ID。
-final class KeychainService {
+final class KeychainService: @unchecked Sendable {
     static let shared = KeychainService()
 
     private let service: String
@@ -96,11 +96,11 @@ final class KeychainService {
 }
 
 /// provider 读取 secret 的抽象，测试注入内存实现。
-protocol SecretResolving {
+protocol SecretResolving: Sendable {
     func secret(for itemID: UUID) throws -> String
 }
 
-struct KeychainSecretResolver: SecretResolving {
+struct KeychainSecretResolver: SecretResolving, @unchecked Sendable {
     var keychain: KeychainService = .shared
 
     func secret(for itemID: UUID) throws -> String {
@@ -111,8 +111,17 @@ struct KeychainSecretResolver: SecretResolving {
     }
 }
 
+/// 在后台读取 Keychain：系统授权弹窗会阻塞调用线程，不能占用主线程。
+enum SecretReader {
+    static func secret(_ resolver: SecretResolving, for itemID: UUID) async throws -> String {
+        try await Task.detached(priority: .userInitiated) {
+            try resolver.secret(for: itemID)
+        }.value
+    }
+}
+
 /// 测试/预览用：内存中的 secret 表。
-final class InMemorySecretResolver: SecretResolving {
+final class InMemorySecretResolver: SecretResolving, @unchecked Sendable {
     private var storage: [UUID: String]
 
     init(_ storage: [UUID: String] = [:]) {

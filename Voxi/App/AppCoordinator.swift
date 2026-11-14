@@ -36,6 +36,10 @@ final class AppCoordinator: ObservableObject {
     /// 本次 session 是否由“按住快捷键”触发（菜单/API 触发不受松键保护影响）。
     private var startedWithShortcutHeld = false
     private var capturedByteCount = 0
+    /// 连接 ASR 期间采集到的 PCM，就绪后按顺序补发。
+    private var pendingAudio: [Data] = []
+    /// 连接期间用户已松开快捷键：连接成功后立即收尾，而不是丢弃录音。
+    private var stopRequestedWhileConnecting = false
     /// 快捷键触发时记录的前台应用 PID；输入前必须仍然一致。
     private var targetApplicationPID: pid_t?
 
@@ -118,10 +122,13 @@ final class AppCoordinator: ObservableObject {
         case .ignore: break
         }
 
-        // 按住模式下，权限弹窗或连接还没结束就松开快捷键：取消本次录音，避免永久录音。
-        if event == .keyUp, mode == .holdToTalk,
-           appState.state == .requestingPermission || appState.state == .connecting {
+        // 按住模式下，权限弹窗还没结束就松开快捷键：取消本次录音。
+        if event == .keyUp, mode == .holdToTalk, appState.state == .requestingPermission {
             cancelCurrentSession()
+        }
+        // 连接尚未完成时松键：标记连接完成后立即收尾，保留已采集音频。
+        if event == .keyUp, mode == .holdToTalk, appState.state == .connecting {
+            stopRecording()
         }
     }
 
@@ -180,8 +187,12 @@ final class AppCoordinator: ObservableObject {
         let sessionID = UUID()
         currentSessionID = sessionID
         startedWithShortcutHeld = shortcutHeld
-        // 只对快捷键触发的录音锁定目标应用；菜单按钮触发时前台就是 Voxi 自己。
-        targetApplicationPID = shortcutHeld ? frontmostProvider.currentPID() : nil
+        stopRequestedWhileConnecting = false
+        pendingAudio.removeAll()
+        // 锁定录音开始时的前台应用；若前台是 Voxi 自己（例如从菜单栏触发），则不锁定，
+        // 由面板在开始录音前恢复上一个应用的前台状态。
+        let frontPID = frontmostProvider.currentPID()
+        targetApplicationPID = frontPID == ProcessInfo.processInfo.processIdentifier ? nil : frontPID
         appState.beginSession(id: sessionID, provider: profile.kind)
         Logger.app.info("开始录音 session=\(sessionID.uuidString, privacy: .public) provider=\(profile.kind.rawValue, privacy: .public)")
 
@@ -200,6 +211,12 @@ final class AppCoordinator: ObservableObject {
     // MARK: - 停止录音
 
     func stopRecording() {
+        if appState.state == .connecting {
+            // 连接期间松键：保留已采集音频，连接完成后立即收尾。
+            stopRequestedWhileConnecting = true
+            Logger.app.debug("连接进行中收到停止请求，将在连接就绪后收尾")
+            return
+        }
         guard appState.state.isRecording else {
             Logger.app.debug("忽略停止请求：当前状态 \(self.appState.state.rawValue, privacy: .public)")
             return
@@ -230,6 +247,8 @@ final class AppCoordinator: ObservableObject {
         let session = transcriptionSession
         transcriptionSession = nil
         capturedByteCount = 0
+        pendingAudio.removeAll()
+        stopRequestedWhileConnecting = false
 
         transition(to: .cancelling)
         finishSession()
@@ -294,15 +313,20 @@ final class AppCoordinator: ObservableObject {
             audioDuration: nil
         )
 
-        // 火山需要先建连并发送初始化帧，成功后才开始采集音频。
+        // 火山需要先建连并发送初始化帧；连接期间仍然先开始采集并缓冲音频。
         if profile.kind == .volcengineStreaming {
             transition(to: .connecting)
         }
 
         Task { [weak self] in
             do {
+                guard let self else { return }
+                try await self.startAudioCapture(sessionID: sessionID)
+                Logger.app.debug("采集已启动（状态=\(self.appState.state.rawValue, privacy: .public)）")
+
                 let session = try await provider.makeSession(profile: profile, options: options)
-                guard let self, self.currentSessionID == sessionID,
+                Logger.app.debug("ASR 会话就绪（状态=\(self.appState.state.rawValue, privacy: .public)）")
+                guard self.currentSessionID == sessionID,
                       self.appState.state == .requestingPermission || self.appState.state == .connecting
                 else {
                     await session.cancel()
@@ -310,12 +334,20 @@ final class AppCoordinator: ObservableObject {
                 }
                 self.transcriptionSession = session
                 self.observeUpdates(session: session, sessionID: sessionID)
-                try await self.startAudioCapture(sessionID: sessionID, session: session)
+                // 立即补发连接期间缓冲的音频，不必等下一个分片。
+                await self.flushPendingAudio(into: session)
+                self.transition(to: .recording, startedAt: self.captureStartedAt ?? Date())
+                if self.stopRequestedWhileConnecting {
+                    self.stopRequestedWhileConnecting = false
+                    self.stopRecording()
+                }
             } catch {
                 self?.failStart(error, sessionID: sessionID)
             }
         }
     }
+
+    private var captureStartedAt: Date?
 
     /// 订阅流式临时结果：只更新菜单栏预览，绝不写入前台应用。
     private func observeUpdates(session: any TranscriptionSession, sessionID: UUID) {
@@ -336,7 +368,7 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    private func startAudioCapture(sessionID: UUID, session: any TranscriptionSession) async throws {
+    private func startAudioCapture(sessionID: UUID) async throws {
         // AVAudioEngine 的启动/停止不能在主线程执行：设备切换时 CoreAudio 可能阻塞数秒。
         let capture = audioCapture
         let stream = try await Self.runWithTimeout(seconds: 10) {
@@ -351,19 +383,48 @@ final class AppCoordinator: ObservableObject {
             return
         }
         capturedByteCount = 0
+        captureStartedAt = Date()
         audioTask = Task { [weak self] in
             for await chunk in stream {
                 guard let self, self.currentSessionID == sessionID else { return }
                 self.capturedByteCount += chunk.count
-                do {
-                    try await session.appendAudio(chunk)
-                } catch {
-                    await self.handleStreamingFailure(error, sessionID: sessionID)
-                    return
-                }
+                await self.sendOrBufferAudio(chunk, sessionID: sessionID)
             }
         }
-        transition(to: .recording, startedAt: Date())
+    }
+
+    /// 音频发送：ASR 会话未就绪时先缓冲，就绪后按顺序补发。
+    private func sendOrBufferAudio(_ chunk: Data, sessionID: UUID) async {
+        guard let session = transcriptionSession else {
+            pendingAudio.append(chunk)
+            // 最多保留约 30 秒（150 × 200ms），防止连接异常时无限占用内存。
+            if pendingAudio.count > 150 {
+                pendingAudio.removeFirst()
+            }
+            return
+        }
+        do {
+            await flushPendingAudio(into: session)
+            try await session.appendAudio(chunk)
+        } catch {
+            await handleStreamingFailure(error, sessionID: sessionID)
+        }
+    }
+
+    /// 按约 100ms 的节奏补发缓冲音频，避免一次性突发导致服务端丢弃。
+    private func flushPendingAudio(into session: any TranscriptionSession) async {
+        guard !pendingAudio.isEmpty else { return }
+        Logger.app.debug("补发缓冲音频 \(self.pendingAudio.count, privacy: .public) 块")
+        while !pendingAudio.isEmpty {
+            let buffered = pendingAudio.removeFirst()
+            do {
+                try await session.appendAudio(buffered)
+            } catch {
+                Logger.app.error("补发缓冲音频失败: \(String(describing: error), privacy: .public)")
+                return
+            }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
     }
 
     private func finishRecording(sessionID: UUID?) async {
@@ -386,11 +447,17 @@ final class AppCoordinator: ObservableObject {
             return
         }
 
+        // 等待音频消费者把结尾数据送达（stream 在 finish 时结束）。
+        await audioTask?.value
+        audioTask = nil
+        stopRequestedWhileConnecting = false
+
         guard currentSessionID == sessionID, let session = transcriptionSession else {
             AudioCaptureService.removeRecording(at: metadata.fileURL)
             return
         }
 
+        await flushPendingAudio(into: session)
         appState.setInterimText("")
         transition(to: .transcribing)
         let optionsDuration = metadata.duration
@@ -486,6 +553,7 @@ final class AppCoordinator: ObservableObject {
         audioCapture.cancel()
         audioTask?.cancel()
         audioTask = nil
+        pendingAudio.removeAll()
         cleanupTranscriptionSession()
         appState.present(error: AppError(message: error.localizedDescription))
         transition(to: .failed)

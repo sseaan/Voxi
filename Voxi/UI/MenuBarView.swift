@@ -5,6 +5,10 @@ struct MenuBarView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var appState: AppState
     @ObservedObject var coordinator: AppCoordinator
+    /// 在打开设置/退出前关闭自定义面板。
+    var onRequestClose: (() -> Void)?
+    var onStartRecording: (() -> Void)?
+    var onStopRecording: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -39,6 +43,12 @@ struct MenuBarView: View {
         }
         .padding(16)
         .frame(width: 340)
+        .background(PanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.08))
+        )
     }
 
     // MARK: - 组件
@@ -161,7 +171,11 @@ struct MenuBarView: View {
         HStack(spacing: 8) {
             if appState.state == .idle || appState.state == .failed {
                 Button {
-                    coordinator.startRecording()
+                    if let onStartRecording {
+                        onStartRecording()
+                    } else {
+                        coordinator.startRecording()
+                    }
                 } label: {
                     Label("开始录音", systemImage: "mic.fill")
                         .frame(maxWidth: .infinity)
@@ -169,7 +183,11 @@ struct MenuBarView: View {
                 .buttonStyle(.borderedProminent)
             } else if appState.state.isRecording {
                 Button(role: .destructive) {
-                    coordinator.stopRecording()
+                    if let onStopRecording {
+                        onStopRecording()
+                    } else {
+                        coordinator.stopRecording()
+                    }
                 } label: {
                     Label("停止并识别", systemImage: "stop.fill")
                         .frame(maxWidth: .infinity)
@@ -195,6 +213,7 @@ struct MenuBarView: View {
     private var footer: some View {
         HStack {
             Button {
+                onRequestClose?()
                 SettingsWindowController.shared.show(
                     settings: settings,
                     appState: appState,
@@ -208,6 +227,7 @@ struct MenuBarView: View {
             Spacer()
 
             Button {
+                onRequestClose?()
                 NSApp.terminate(nil)
             } label: {
                 Label("退出 Voxi", systemImage: "power")
@@ -221,4 +241,17 @@ struct MenuBarView: View {
         let total = max(0, Int(elapsed.rounded(.down)))
         return String(format: "%d:%02d", total / 60, total % 60)
     }
+}
+
+/// 自定义 NSPanel 的面板背景材质（系统 popover 背景不可用）。
+struct PanelBackground: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }

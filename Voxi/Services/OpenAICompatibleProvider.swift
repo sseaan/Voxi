@@ -189,7 +189,12 @@ final class OpenAICompatibleSession: TranscriptionSession {
             throw TranscriptionError.audioFileUnreadable
         }
 
-        let secret = try profile.apiKeyItemID.map { try secretResolver.secret(for: $0) }
+        let secret: String?
+        if let itemID = profile.apiKeyItemID {
+            secret = try await SecretReader.secret(secretResolver, for: itemID)
+        } else {
+            secret = nil
+        }
         let request = try OpenAICompatibleRequestBuilder.makeRequest(
             profile: profile,
             secret: secret,

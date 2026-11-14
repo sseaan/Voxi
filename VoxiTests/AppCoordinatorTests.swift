@@ -13,6 +13,7 @@ final class StubAudioCapture: AudioCapturing, @unchecked Sendable {
     private(set) var finishCount = 0
     private(set) var cancelCount = 0
     private(set) var lastFileURL: URL?
+    var chunkCount = 1
 
     init(behaviour: Behaviour = .success(duration: 1.2)) {
         self.behaviour = behaviour
@@ -20,8 +21,11 @@ final class StubAudioCapture: AudioCapturing, @unchecked Sendable {
 
     func start() throws -> AsyncStream<Data> {
         startCount += 1
+        let chunks = chunkCount
         return AsyncStream { continuation in
-            continuation.yield(Data(repeating: 1, count: 6_400))
+            for _ in 0..<chunks {
+                continuation.yield(Data(repeating: 1, count: 6_400))
+            }
             continuation.finish()
         }
     }
@@ -175,7 +179,7 @@ final class AppCoordinatorTests: XCTestCase {
             if condition() { return }
             try? await Task.sleep(nanoseconds: 20_000_000)
         }
-        XCTFail("等待状态超时，当前状态 \(appStateDescription())")
+        XCTFail("等待状态超时")
     }
 
     private func appStateDescription() -> String { "" }
@@ -504,7 +508,7 @@ final class AppCoordinatorTests: XCTestCase {
         await waitFor { state.state == .recording }
     }
 
-    func testReleasingShortcutWhileConnectingCancelsVolcengineSession() async {
+    func testReleasingShortcutWhileConnectingFinishesInsteadOfDiscarding() async {
         let provider = FakeTranscriptionProvider(kind: .volcengineStreaming)
         provider.makeSessionDelayNanoseconds = 150_000_000
         let suite = "test.\(UUID().uuidString)"
@@ -526,10 +530,40 @@ final class AppCoordinatorTests: XCTestCase {
         coordinator.handleShortcutPress()
         await waitFor { state.state == .connecting }
         coordinator.handleShortcutRelease()
-        XCTAssertEqual(state.state, .idle)
-        try? await Task.sleep(nanoseconds: 250_000_000)
-        XCTAssertEqual(state.state, .idle)
+        // 连接期间松键：不取消，等连接完成后收尾并识别。
+        await waitFor(timeout: 3) { state.state == .idle }
+        XCTAssertEqual(provider.session.finishCallCount, 1)
+        XCTAssertEqual(provider.session.cancelCallCount, 0)
         XCTAssertNil(state.sessionID)
+    }
+
+    func testBufferedAudioIsSentAfterSessionBecomesReady() async {
+        let audio = StubAudioCapture()
+        audio.chunkCount = 3
+        let provider = FakeTranscriptionProvider(kind: .volcengineStreaming)
+        provider.makeSessionDelayNanoseconds = 150_000_000
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        let store = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        store.settings.profiles = [.defaultVolcengineProfile()]
+        store.settings.activeProfileID = store.settings.profiles.first?.id
+        let state = AppState()
+        let coordinator = AppCoordinator(
+            settings: store,
+            appState: state,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: audio,
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
+        )
+
+        coordinator.startRecording()
+        await waitFor(timeout: 3) { provider.session.appendedChunks.count >= 3 }
+        XCTAssertEqual(provider.session.appendedChunks.count, 3, "连接期间缓冲的音频必须在就绪后补发")
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+        XCTAssertEqual(provider.session.finishCallCount, 1)
     }
 
     func testInterimUpdatesOnlyAffectPreviewAndNeverResult() async {
@@ -575,7 +609,7 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(state.noticeMessage?.contains("已输入") ?? false)
     }
 
-    func testMenuTriggeredInsertionDoesNotPinFrontmostPID() async {
+    func testMenuTriggeredInsertionCapturesFrontmostPID() async {
         let (coordinator, _, state, _) = makeCoordinator()
 
         coordinator.startRecording()
@@ -584,7 +618,7 @@ final class AppCoordinatorTests: XCTestCase {
         await waitFor { state.state == .idle }
 
         XCTAssertEqual(textInserter.insertions.count, 1)
-        XCTAssertNil(textInserter.insertions.first?.pid, "菜单触发的录音不应锁定前台 PID")
+        XCTAssertEqual(textInserter.insertions.first?.pid, 777, "菜单触发的录音也应锁定开始时的前台 PID")
     }
 
     func testAutoInsertDisabledKeepsResultForManualCopy() async {
