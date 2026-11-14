@@ -304,14 +304,7 @@ final class OpenAICompatibleSession: TranscriptionSession {
         }
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
-            switch nsError.code {
-            case NSURLErrorTimedOut:
-                return .timeout
-            case NSURLErrorCancelled:
-                return .cancelled
-            default:
-                return .network(nsError.localizedDescription)
-            }
+            return TranscriptionError.mapURLError(nsError)
         }
         return .network(nsError.localizedDescription)
     }

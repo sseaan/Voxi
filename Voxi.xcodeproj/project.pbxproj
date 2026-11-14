@@ -53,6 +53,7 @@
 		EAA81FEED526CD5179958DB2 /* MultipartFormData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */; };
 		EBAAFD71ABDE417D3A5C28DE /* WAVFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A2FE3515ED55DDB93AC08F /* WAVFileWriter.swift */; };
 		ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CA3F36E3B96C0524780F4F /* SettingsStore.swift */; };
+		ECC28055BF7ED75EB06026D7 /* MainMenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */; };
 		F079D6444485C416D2581E4D /* ShortcutRecorderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */; };
 		F17C17E60430CA8BEA6A880B /* AppCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8423D644E4AEA07F824D1E /* AppCoordinatorTests.swift */; };
 		F4B869267B5F8CF39757934C /* VolcengineWebSocketCodecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B87F00B5189CFE5F74C207 /* VolcengineWebSocketCodecTests.swift */; };
@@ -117,6 +118,7 @@
 		B8B87F00B5189CFE5F74C207 /* VolcengineWebSocketCodecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolcengineWebSocketCodecTests.swift; sourceTree = "<group>"; };
 		BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointProfile.swift; sourceTree = "<group>"; };
 		BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointEditorView.swift; sourceTree = "<group>"; };
+		C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
 		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileTranscriptionView.swift; sourceTree = "<group>"; };
 		E1D36565ECDB1D74960D92BE /* TextInsertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionService.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				41BCB971E6CFA8CF90864456 /* GzipShim.h */,
 				40FF2507C98B65F7B1B54B61 /* GzipShim.m */,
 				57C9E45456AA639B9D729E82 /* Logger.swift */,
+				C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */,
 				76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */,
 				ABBB641B5E4A0EB451E611A9 /* RecordingIndicatorController.swift */,
 				0765F3B1517F7C139568E4FF /* SettingsWindowController.swift */,
@@ -385,6 +388,7 @@
 				1EB3DF67B59B4C9F2AFEF13F /* GzipShim.m in Sources */,
 				3B404FD53DF7832BB8468B0D /* KeychainService.swift in Sources */,
 				001C89F6AE536D0DA770C6A5 /* Logger.swift in Sources */,
+				ECC28055BF7ED75EB06026D7 /* MainMenuBuilder.swift in Sources */,
 				E6578F51F7B7033DAEB63702 /* MenuBarView.swift in Sources */,
 				EAA81FEED526CD5179958DB2 /* MultipartFormData.swift in Sources */,
 				AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */,

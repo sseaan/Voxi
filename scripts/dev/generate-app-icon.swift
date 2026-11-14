@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-// 生成 Voxi AppIcon：1024 底图 + 全套尺寸 PNG。
+// 生成 Voxi AppIcon：深蓝渐变 + 发光声波曲线。
 // 运行：swift scripts/dev/generate-app-icon.swift
 
 let outputDirectory = URL(fileURLWithPath: "Voxi/Resources/Assets.xcassets/AppIcon.appiconset")
@@ -12,44 +12,89 @@ let image = NSImage(size: NSSize(width: size, height: size))
 image.lockFocus()
 guard let context = NSGraphicsContext.current?.cgContext else { fatalError("no context") }
 
-// 背景圆角方块
+// 圆角方块
 let rect = CGRect(x: 24, y: 24, width: size - 48, height: size - 48)
-let path = CGPath(roundedRect: rect, cornerWidth: 220, cornerHeight: 220, transform: nil)
+let squircle = CGPath(roundedRect: rect, cornerWidth: 226, cornerHeight: 226, transform: nil)
 context.saveGState()
-context.addPath(path)
+context.addPath(squircle)
 context.clip()
+
+// 靛蓝 → 蓝 → 青 的斜向渐变
 let colors = [
-    NSColor(srgbRed: 0.23, green: 0.47, blue: 0.96, alpha: 1).cgColor,   // 蓝
-    NSColor(srgbRed: 0.55, green: 0.33, blue: 0.95, alpha: 1).cgColor    // 紫
+    NSColor(srgbRed: 0.35, green: 0.20, blue: 0.86, alpha: 1).cgColor,  // #5933DB
+    NSColor(srgbRed: 0.16, green: 0.38, blue: 0.94, alpha: 1).cgColor,  // #2A61F0
+    NSColor(srgbRed: 0.10, green: 0.68, blue: 0.83, alpha: 1).cgColor   // #1AADD4
 ]
-let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: colors as CFArray, locations: [0, 1])!
+let gradient = CGGradient(
+    colorsSpace: CGColorSpaceCreateDeviceRGB(),
+    colors: colors as CFArray,
+    locations: [0, 0.55, 1]
+)!
 context.drawLinearGradient(
     gradient,
     start: CGPoint(x: rect.minX, y: rect.maxY),
     end: CGPoint(x: rect.maxX, y: rect.minY),
     options: []
 )
-// 顶部高光
-context.setFillColor(NSColor.white.withAlphaComponent(0.10).cgColor)
-context.fill(CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2))
+
+// 顶部线性高光（避免径向渐变中心出现暗点）
+let glowColors = [
+    NSColor.white.withAlphaComponent(0.16).cgColor,
+    NSColor.white.withAlphaComponent(0.0).cgColor
+]
+let glow = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: glowColors as CFArray, locations: [0, 1])!
+context.drawLinearGradient(
+    glow,
+    start: CGPoint(x: rect.midX, y: rect.maxY),
+    end: CGPoint(x: rect.midX, y: rect.midY + 100),
+    options: []
+)
 context.restoreGState()
 
-// 白色波形：中间高、两侧低
-let heights: [CGFloat] = [0.18, 0.30, 0.46, 0.66, 0.86, 0.66, 0.46, 0.30, 0.18]
-let barWidth: CGFloat = 46
-let gap: CGFloat = 30
+// 白色波形柱
+let heights: [CGFloat] = [0.22, 0.42, 0.66, 0.92, 0.66, 0.42, 0.22]
+let barWidth: CGFloat = 52
+let gap: CGFloat = 38
+let maxHeight: CGFloat = 430
 let totalWidth = CGFloat(heights.count) * barWidth + CGFloat(heights.count - 1) * gap
 var x = (size - totalWidth) / 2
-context.setShadow(offset: .zero, blur: 26, color: NSColor.black.withAlphaComponent(0.28).cgColor)
-context.setFillColor(NSColor.white.cgColor)
+
+context.saveGState()
+context.setShadow(offset: .zero, blur: 34, color: NSColor.white.withAlphaComponent(0.28).cgColor)
 for height in heights {
-    let h = 440 * height + 90
-    let bar = CGRect(x: x, y: (size - h) / 2, width: barWidth, height: h)
-    let barPath = CGPath(roundedRect: bar, cornerWidth: barWidth / 2, cornerHeight: barWidth / 2, transform: nil)
+    let barHeight = 100 + maxHeight * height
+    let barRect = CGRect(x: x, y: (size - barHeight) / 2, width: barWidth, height: barHeight)
+    let barPath = CGPath(roundedRect: barRect, cornerWidth: barWidth / 2, cornerHeight: barWidth / 2, transform: nil)
+    let barGradientColors = [
+        NSColor.white.cgColor,
+        NSColor(srgbRed: 0.85, green: 0.93, blue: 1.0, alpha: 1).cgColor
+    ]
+    let barGradient = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(),
+        colors: barGradientColors as CFArray,
+        locations: [0, 1]
+    )!
+    context.saveGState()
     context.addPath(barPath)
-    context.fillPath()
+    context.clip()
+    context.drawLinearGradient(
+        barGradient,
+        start: CGPoint(x: barRect.midX, y: barRect.maxY),
+        end: CGPoint(x: barRect.midX, y: barRect.minY),
+        options: []
+    )
+    context.restoreGState()
     x += barWidth + gap
 }
+context.restoreGState()
+
+// 内侧描边
+context.saveGState()
+context.addPath(squircle)
+context.setStrokeColor(NSColor.white.withAlphaComponent(0.12).cgColor)
+context.setLineWidth(5)
+context.strokePath()
+context.restoreGState()
 
 image.unlockFocus()
 

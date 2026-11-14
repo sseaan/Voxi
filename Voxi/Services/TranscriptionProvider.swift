@@ -90,4 +90,28 @@ enum TranscriptionError: Error, LocalizedError, Equatable {
     var isCancellation: Bool {
         self == .cancelled
     }
+
+    /// 可重试的瞬时网络错误（断网、连接中断、DNS 失败等）。
+    var isTransientNetwork: Bool {
+        if case .network = self { return true }
+        return false
+    }
+
+    /// 统一的 URLError 映射，避免把 -1009 直接抛给用户。
+    static func mapURLError(_ error: NSError) -> TranscriptionError {
+        switch error.code {
+        case NSURLErrorTimedOut:
+            return .timeout
+        case NSURLErrorCancelled:
+            return .cancelled
+        case NSURLErrorNotConnectedToInternet,
+             NSURLErrorNetworkConnectionLost,
+             NSURLErrorCannotConnectToHost,
+             NSURLErrorDNSLookupFailed,
+             NSURLErrorResourceUnavailable:
+            return .network("网络连接不可用或已中断（\(error.code)）。请检查网络、VPN 或代理后重试。")
+        default:
+            return .network(error.localizedDescription)
+        }
+    }
 }

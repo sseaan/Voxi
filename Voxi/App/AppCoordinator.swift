@@ -388,7 +388,9 @@ final class AppCoordinator: ObservableObject {
             for await chunk in stream {
                 guard let self, self.currentSessionID == sessionID else { return }
                 self.capturedByteCount += chunk.count
-                self.appState.updateAudioLevel(Self.audioLevel(fromPCM16: chunk))
+                for level in Self.audioLevels(fromPCM16: chunk) {
+                    self.appState.updateAudioLevel(level)
+                }
                 await self.sendOrBufferAudio(chunk, sessionID: sessionID)
             }
         }
@@ -601,9 +603,31 @@ final class AppCoordinator: ObservableObject {
         }
         guard count > 0 else { return 0 }
         let rms = sqrt(sum / Double(count))
-        // 放大到可读范围，并以平方根压缩动态范围。
         let amplified = min(1.0, rms * 6.0)
         return Float(sqrt(amplified))
+    }
+
+    /// 把 200ms 的一包音频拆成多个约 40ms 的小段音量，让浮条波形接近实时。
+    nonisolated static func audioLevels(fromPCM16 data: Data, windowBytes: Int = 1_280) -> [Float] {
+        guard data.count >= 2 else { return [] }
+        let window = max(2, windowBytes - (windowBytes % 2))
+        return data.withUnsafeBytes { raw -> [Float] in
+            let samples = raw.bindMemory(to: Int16.self)
+            var levels: [Float] = []
+            var start = 0
+            while start < samples.count {
+                let end = min(start + window / 2, samples.count)
+                var sum = 0.0
+                for index in start..<end {
+                    let value = Double(samples[index]) / 32_768.0
+                    sum += value * value
+                }
+                let rms = sqrt(sum / Double(max(1, end - start)))
+                levels.append(Float(sqrt(min(1.0, rms * 6.0))))
+                start = end
+            }
+            return levels
+        }
     }
 
     private func transition(to newState: RecordingState, startedAt: Date? = nil) {

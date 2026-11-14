@@ -205,6 +205,13 @@ final class AudioFileConverterTests: XCTestCase {
 }
 
 final class AudioLevelTests: XCTestCase {
+    func testChunkIsSplitIntoRealtimeSubLevels() {
+        let chunk = Data(repeating: 0, count: 6_400)
+        let levels = AppCoordinator.audioLevels(fromPCM16: chunk)
+        XCTAssertEqual(levels.count, 5, "6400 字节按 1280 字节切成 5 段")
+        XCTAssertTrue(levels.allSatisfy { $0 == 0 })
+    }
+
     func testSilenceLevelIsZero() {
         let silence = Data(repeating: 0, count: 6_400)
         XCTAssertEqual(AppCoordinator.audioLevel(fromPCM16: silence), 0, accuracy: 0.001)

@@ -63,6 +63,21 @@ final class ShortcutEventMapperTests: XCTestCase {
 }
 
 @MainActor
+final class MainMenuTests: XCTestCase {
+    func testMainMenuProvidesEditingCommands() {
+        MainMenuBuilder.install(actions: AppMenuActions())
+        let edit = NSApp.mainMenu?.items.first { $0.submenu?.title == "编辑" }?.submenu
+        XCTAssertNotNil(edit)
+        let paste = edit?.items.first { $0.keyEquivalent == "v" }
+        XCTAssertEqual(paste?.action, Selector(("paste:")))
+        let copy = edit?.items.first { $0.keyEquivalent == "c" }
+        XCTAssertEqual(copy?.action, Selector(("copy:")))
+        let selectAll = edit?.items.first { $0.keyEquivalent == "a" }
+        XCTAssertEqual(selectAll?.action, Selector(("selectAll:")))
+    }
+}
+
+@MainActor
 final class ShortcutRegistrationTests: XCTestCase {
     func testInvalidCombinationIsRejectedBeforeTouchingCarbon() {
         let service = ShortcutService()

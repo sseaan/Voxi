@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: AppCoordinator!
     private var statusItem: StatusItemController!
     private var recordingIndicator: RecordingIndicatorController!
+    private let menuActions = AppMenuActions()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = SettingsStore()
@@ -29,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.coordinator = coordinator
         self.statusItem = StatusItemController(settings: settings, appState: state, coordinator: coordinator)
         self.recordingIndicator = RecordingIndicatorController(appState: state)
+        menuActions.configure(settings: settings, appState: state, coordinator: coordinator)
+        MainMenuBuilder.install(actions: menuActions)
         coordinator.activate()
     }
 

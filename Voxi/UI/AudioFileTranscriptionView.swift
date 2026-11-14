@@ -30,6 +30,7 @@ final class AudioFileTranscriptionModel: ObservableObject {
     private var wavURL: URL?
     private var workTask: Task<Void, Never>?
     private var session: (any TranscriptionSession)?
+    private var networkRetryUsed = false
 
     init(settings: SettingsStore, targetPID: pid_t?) {
         self.settings = settings
@@ -69,6 +70,7 @@ final class AudioFileTranscriptionModel: ObservableObject {
             .appendingPathComponent("Voxi-upload-\(UUID().uuidString).wav")
         self.wavURL = wavURL
         phase = .converting(0)
+        networkRetryUsed = false
 
         workTask = Task { [weak self] in
             guard let self else { return }
@@ -85,7 +87,15 @@ final class AudioFileTranscriptionModel: ObservableObject {
                     }
                 }.value
                 try Task.checkCancellation()
-                try await self.transcribe(result: result, profile: profile)
+                do {
+                    try await self.transcribe(result: result, profile: profile)
+                } catch let error as TranscriptionError where error.isTransientNetwork && !self.networkRetryUsed {
+                    // 瞬时网络错误自动重试一次（文件已转换好，无需重新转换）。
+                    self.networkRetryUsed = true
+                    self.notice = "网络中断，正在自动重试一次…"
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    try await self.transcribe(result: result, profile: profile)
+                }
             } catch is CancellationError {
                 self.phase = .idle
             } catch {
@@ -370,9 +380,8 @@ final class AudioFileTranscriptionWindowController: NSObject, NSWindowDelegate {
     private var model: AudioFileTranscriptionModel?
 
     func show(settings: SettingsStore, targetPID: pid_t?) {
-        if let window {
+        if window != nil {
             close()
-            window.orderOut(nil)
         }
         let model = AudioFileTranscriptionModel(settings: settings, targetPID: targetPID)
         let hosting = NSHostingController(

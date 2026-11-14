@@ -560,16 +560,10 @@ final class VolcengineStreamingSession: TranscriptionSession {
         }
         let nsError = error as NSError
         if nsError.domain == NSURLErrorDomain {
-            switch nsError.code {
-            case NSURLErrorTimedOut:
-                return TranscriptionError.timeout
-            case NSURLErrorCancelled:
-                return TranscriptionError.cancelled
-            case NSURLErrorBadServerResponse:
+            if nsError.code == NSURLErrorBadServerResponse {
                 return TranscriptionError.invalidResponse("WebSocket 握手被拒绝（请检查 API Key / Resource ID）")
-            default:
-                return TranscriptionError.network(nsError.localizedDescription)
             }
+            return TranscriptionError.mapURLError(nsError)
         }
         return TranscriptionError.network(nsError.localizedDescription)
     }
