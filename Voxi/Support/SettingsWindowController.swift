@@ -20,8 +20,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
-            window.setContentSize(NSSize(width: 900, height: 620))
-            window.minSize = NSSize(width: 840, height: 560)
+            window.setContentSize(NSSize(width: 720, height: 520))
+            window.minSize = NSSize(width: 700, height: 500)
             window.isReleasedWhenClosed = false
             window.center()
             window.delegate = self

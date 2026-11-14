@@ -21,7 +21,6 @@ struct SettingsView: View {
             sidebar
             Divider()
             VStack(spacing: 0) {
-                pageHeader
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if tab == .general || tab == .text {
@@ -31,19 +30,8 @@ struct SettingsView: View {
             }
             .background(Color(nsColor: .windowBackgroundColor))
         }
-        .frame(minWidth: 840, minHeight: 560)
+        .frame(minWidth: 720, minHeight: 520)
         .background(Color(nsColor: .windowBackgroundColor))
-    }
-
-    private var pageHeader: some View {
-        HStack {
-            Text(tab.title)
-                .font(.system(size: 20, weight: .bold))
-            Spacer()
-        }
-        .padding(.horizontal, 26)
-        .padding(.top, 24)
-        .padding(.bottom, 8)
     }
 
     private var sidebar: some View {
@@ -86,7 +74,7 @@ struct SettingsView: View {
             Spacer()
         }
         .padding(10)
-        .frame(width: 184)
+        .frame(width: 178)
         .background(.regularMaterial)
     }
 
@@ -146,7 +134,7 @@ struct GeneralSettingsView: View {
     }
 
     var body: some View {
-        SettingsPage {
+        SettingsPage(title: "通用") {
             SettingsCard("录音方式", footer: "按住说话适合短句；切换模式适合较长段落。") {
                 ForEach(RecordingMode.allCases) { mode in
                     Button {
@@ -294,6 +282,20 @@ private struct SettingsSidebarItem: View {
 
 struct AboutSettingsView: View {
     var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                Text("关于")
+                    .font(.system(size: 20, weight: .bold))
+                    .padding(.top, 34)
+                aboutContent
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var aboutContent: some View {
         VStack(spacing: 12) {
             Image(systemName: "waveform.circle.fill")
                 .font(.system(size: 48))
@@ -315,8 +317,8 @@ struct AboutSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(24)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 30)
     }
 }
 

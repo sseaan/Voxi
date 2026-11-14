@@ -13,26 +13,26 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "通用"
         case .text: return "文本"
-        case .endpoints: return "识别服务"
+        case .endpoints: return "模型"
         case .about: return "关于"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .general: return "gearshape"
+        case .general: return "gearshape.fill"
         case .text: return "textformat"
-        case .endpoints: return "antenna.radiowaves.left.and.right"
-        case .about: return "info.circle"
+        case .endpoints: return "square.stack.3d.up.fill"
+        case .about: return "info.circle.fill"
         }
     }
 
     var iconColor: Color {
         switch self {
-        case .general: return Color(red: 0.23, green: 0.51, blue: 0.96)
-        case .text: return Color(red: 0.55, green: 0.36, blue: 0.96)
-        case .endpoints: return Color(red: 0.06, green: 0.64, blue: 0.60)
-        case .about: return Color(red: 0.42, green: 0.47, blue: 0.55)
+        case .general: return Color(red: 0.42, green: 0.48, blue: 0.56)
+        case .text: return Color(red: 0.56, green: 0.45, blue: 0.86)
+        case .endpoints: return Color(red: 0.33, green: 0.47, blue: 0.92)
+        case .about: return Color(red: 0.52, green: 0.56, blue: 0.62)
         }
     }
 }
@@ -207,16 +207,27 @@ struct StatusBadge: View {
 
 /// 设置页内滚动内容的统一容器：限制宽度、统一留白。
 struct SettingsPage<Content: View>: View {
+    var title: String?
     @ViewBuilder var content: Content
+
+    init(title: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
+                if let title {
+                    Text(title)
+                        .font(.system(size: 20, weight: .bold))
+                        .padding(.top, 34)
+                }
                 content
             }
             .frame(maxWidth: 640, alignment: .leading)
-            .padding(.horizontal, 26)
-            .padding(.top, 12)
+            .padding(.horizontal, 24)
+            .padding(.top, title == nil ? 12 : 0)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity)
         }

@@ -4,7 +4,7 @@ struct TextModeEditorView: View {
     @ObservedObject var draft: SettingsDraft
 
     var body: some View {
-        SettingsPage {
+        SettingsPage(title: "文本") {
             SettingsCard("识别语言", footer: "语言只是传给识别服务的提示，实际支持范围由服务决定。") {
                 Picker("语言", selection: $draft.textMode.language) {
                     ForEach(TextMode.Language.allCases) { language in

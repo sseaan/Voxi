@@ -206,3 +206,22 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
    - `.ultraThinMaterial` + 黑色 45% 叠加、22pt 连续圆角、上亮下暗渐变描边，强制深色外观；仍只显示实时波形、无阴影。
 4. **文件转写窗口样式**
    - 文件信息与结果文本改用 controlBackgroundColor 卡片 + 10pt 连续圆角 + 0.07 描边，与设置页统一。
+
+## 第七轮：全面对齐 OpenVoice（2026-11-14 深夜）
+
+对照本机 OpenVoice 源码（SettingsWindow / FloatingPanel）重做：
+
+1. **设置窗口**
+   - 720×520，178pt `regularMaterial` 侧边栏，与 OpenVoice 一致。
+   - 侧边栏：64pt 应用图标、名称/版本、彩色圆角图标导航；图标与配色采用 OpenVoice 的 general/models/about 方案。
+   - 标题栏文字隐藏、全尺寸内容；页面大标题 20pt 放进滚动内容顶部（34pt），不再固定一条标题栏。
+   - 卡片/行/描边/字体全部按 OpenVoice 的 11pt 卡片标题、13/11pt 行、10pt 连续圆角、0.07 描边。
+2. **模型页逻辑**
+   - 移除左右分栏；改为单列「模型来源」卡片：来源行含图标、名称、类型·模型、密钥状态、修改、删除；底部“添加模型来源”。
+   - 添加来源使用 OpenVoice 式供应方选择弹窗（OpenAI-compatible / 火山引擎两张卡片）。
+   - 「语音识别模型」卡片显示当前使用中的模型、测试按钮和切换模型 Picker。
+   - 编辑改为弹窗表单（EndpointEditorView），保存后回到列表；删除来源时一并清理 Keychain 密钥。
+3. **录音提示条**
+   - 完全采用 OpenVoice 的聆听态：呼吸绿点 + 5 段波形 + “正在聆听”，波形高度 3+13×level、0.12s easeOut。
+   - 转录阶段显示转圈 + “正在转录…”，面板宽度在 138/128 间切换。
+   - 深色 `.ultraThinMaterial` + 45% 黑 + 上亮下暗描边，21pt 连续圆角；0.15s 淡入；位置距屏幕底部 64pt；恢复系统窗口阴影。

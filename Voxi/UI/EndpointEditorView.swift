@@ -1,198 +1,408 @@
 import SwiftUI
 
-/// 识别服务列表 + 端点编辑器（左右分栏）。
+/// 模型页：单一列表 + 弹窗编辑，参考 OpenVoice 的模型来源/模型配置结构。
 struct EndpointListView: View {
     @ObservedObject var settings: SettingsStore
-    @State private var selectedID: UUID?
-    @State private var draft: EndpointProfile?
-    @State private var showingTest = false
-    @State private var saveMessage: String?
+    @State private var addingSource = false
+    @State private var editing: EditingProfile?
+    @State private var pendingDelete: EndpointProfile?
+    @State private var testingProfile: EndpointProfile?
+
+    private struct EditingProfile: Identifiable {
+        var profile: EndpointProfile
+        var isNew: Bool
+        var id: UUID { profile.id }
+    }
+
+    private var profiles: [EndpointProfile] { settings.settings.profiles }
+    private var activeProfile: EndpointProfile? { settings.activeProfile }
 
     var body: some View {
-        HSplitView {
-            sidebar
-                .frame(minWidth: 210, maxWidth: 250)
-            editor
-                .frame(minWidth: 460)
-        }
-        .onAppear(perform: loadSelection)
-        .onChange(of: selectedID) { _ in
-            loadDraft()
-        }
-        .onChange(of: settings.settings.profiles) { _ in
-            if selectedID == nil { loadSelection() }
-        }
-    }
-
-    // MARK: - 侧栏
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text("端点")
-                    .font(.headline)
-                Spacer()
-                Menu {
-                    Button("OpenAI-compatible 端点") { addProfile(.defaultOpenAIProfile()) }
-                    Button("火山引擎流式端点") { addProfile(.defaultVolcengineProfile()) }
-                } label: {
-                    Image(systemName: "plus")
+        SettingsPage(title: "模型") {
+            SettingsCard(
+                "模型来源",
+                footer: "API Key 只保存在 macOS 钥匙串中；云端请求直接发往你填写的端点。"
+            ) {
+                ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                    if index > 0 {
+                        Divider().padding(.leading, 12).opacity(0.6)
+                    }
+                    sourceRow(profile)
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("添加端点")
-
+                Divider().padding(.leading, 12).opacity(0.6)
                 Button {
-                    deleteSelected()
+                    addingSource = true
                 } label: {
-                    Image(systemName: "minus")
+                    Label("添加模型来源", systemImage: "plus")
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
                 }
-                .buttonStyle(.borderless)
-                .disabled(settings.settings.profiles.count <= 1)
-                .help("删除当前端点")
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
 
-            List(selection: $selectedID) {
-                ForEach(settings.settings.profiles) { profile in
-                    row(for: profile)
-                        .tag(profile.id)
+            SettingsCard(
+                "语音识别模型",
+                footer: "切换后下一次录音立即生效；当前只使用一个模型。"
+            ) {
+                activeModelRow
+                if profiles.count > 1 {
+                    Divider().padding(.leading, 12).opacity(0.6)
+                    HStack(spacing: 12) {
+                        Text("切换模型")
+                            .font(.system(size: 13))
+                        Spacer()
+                        Picker("", selection: Binding(
+                            get: { activeProfile?.id ?? profiles[0].id },
+                            set: { activate($0) }
+                        )) {
+                            ForEach(profiles) { profile in
+                                Text(profile.name.isEmpty ? "未命名" : profile.name)
+                                    .tag(profile.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 220)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
                 }
             }
-            .listStyle(.sidebar)
-
-            Divider()
-            Text("勾选标记表示当前使用的端点。")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .sheet(isPresented: $addingSource) {
+            ProviderPickerSheet { kind in
+                var profile = kind == .openAICompatible
+                    ? EndpointProfile.defaultOpenAIProfile()
+                    : EndpointProfile.defaultVolcengineProfile()
+                profile.name = kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包"
+                // 等来源选择弹窗完全收起后再打开编辑弹窗，避免两个 sheet 竞争。
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    editing = EditingProfile(profile: profile, isNew: true)
+                }
+            }
+        }
+        .sheet(item: $editing) { item in
+            EndpointEditorSheet(
+                profile: item.profile,
+                isNew: item.isNew,
+                isActive: item.profile.id == settings.settings.activeProfileID,
+                onSave: { saved in
+                    save(saved, isNew: item.isNew)
+                    editing = nil
+                },
+                onCancel: { editing = nil }
+            )
+        }
+        .sheet(item: $testingProfile) { profile in
+            EndpointTestView(profile: profile)
+        }
+        .confirmationDialog(
+            "删除这个模型来源？",
+            isPresented: Binding(
+                get: { pendingDelete != nil },
+                set: { if !$0 { pendingDelete = nil } }
+            ),
+            presenting: pendingDelete
+        ) { profile in
+            Button("删除", role: .destructive) {
+                deleteSecrets(of: profile)
+                settings.removeProfile(id: profile.id)
+                pendingDelete = nil
+            }
+            Button("取消", role: .cancel) { pendingDelete = nil }
+        } message: { profile in
+            Text("将移除「\(profile.name.isEmpty ? "未命名" : profile.name)」及其模型配置。")
+        }
     }
 
-    private func row(for profile: EndpointProfile) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: profile.kind == .openAICompatible
-                  ? "cloud" : "waveform.path.ecg")
-                .foregroundStyle(.secondary)
-                .frame(width: 18)
-                .padding(.top, 2)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 5) {
-                    Text(profile.name.isEmpty ? "未命名" : profile.name)
-                        .font(.body.weight(.medium))
+    private func sourceRow(_ profile: EndpointProfile) -> some View {
+        HStack(spacing: 10) {
+            ProviderBadge(kind: profile.kind, size: 26)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(profile.name.isEmpty ? "未命名来源" : profile.name)
+                        .font(.system(size: 13))
                         .lineLimit(1)
-                    if !profile.validation().isValid {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
                     if profile.id == settings.settings.activeProfileID {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
+                        Text("使用中")
+                            .font(.system(size: 9.5, weight: .medium))
                             .foregroundStyle(.green)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.green.opacity(0.12), in: Capsule())
                     }
                 }
-                Text(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎流式")
-                    .font(.caption)
+                Text(sourceSummary(profile))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: 12)
+            Text(credentialStatus(profile).text)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Button("修改") {
+                editing = EditingProfile(profile: profile, isNew: false)
+            }
+            .controlSize(.small)
+            Button {
+                pendingDelete = profile
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .disabled(profiles.count <= 1)
+            .help("删除模型来源")
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
     }
-
-    // MARK: - 编辑器
 
     @ViewBuilder
-    private var editor: some View {
-        if let draftBinding = Binding($draft) {
-            EndpointEditorView(
-                draft: draftBinding,
-                isActive: draft?.id == settings.settings.activeProfileID,
-                saveMessage: $saveMessage,
-                onSave: { profile in
-                    save(profile)
-                },
-                onTest: { showingTest = true }
-            )
-            .sheet(isPresented: $showingTest) {
-                if let profile = settings.activeProfile {
-                    EndpointTestView(profile: profile)
-                } else {
-                    Text("请先保存端点配置。")
-                        .padding(24)
+    private var activeModelRow: some View {
+        if let active = activeProfile {
+            HStack(spacing: 10) {
+                Text("1")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+                    .background(Color.secondary.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(modelName(active).isEmpty ? "未填写模型" : modelName(active))
+                        .font(.system(size: 13))
+                    Text(active.name.isEmpty ? "未命名来源" : active.name)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 12)
+                Button("测试") {
+                    testingProfile = active
+                }
+                .controlSize(.small)
+                Label("使用中", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.green)
+                    .labelStyle(.titleAndIcon)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
         } else {
-            VStack(spacing: 10) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 30))
-                    .foregroundStyle(.secondary)
-                Text("选择一个端点，或点击左上角 + 新建")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+            Text("尚未选择模型")
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+        }
+    }
+
+    private func activate(_ id: UUID) {
+        settings.settings.activeProfileID = id
+    }
+
+    private func deleteSecrets(of profile: EndpointProfile) {
+        var ids = [profile.apiKeyItemID, profile.appKeyItemID, profile.accessKeyItemID].compactMap { $0 }
+        for field in profile.openAI.customHeaders + profile.openAI.customFormFields {
+            if case .keychain(let id) = field.value { ids.append(id) }
+        }
+        for id in ids {
+            try? KeychainService.shared.delete(id)
+        }
+    }
+
+    private func save(_ profile: EndpointProfile, isNew: Bool) {
+        if let index = settings.settings.profiles.firstIndex(where: { $0.id == profile.id }) {
+            settings.settings.profiles[index] = profile
+        } else {
+            settings.settings.profiles.append(profile)
+        }
+        if isNew || settings.settings.activeProfileID == profile.id {
+            settings.settings.activeProfileID = profile.id
+        }
+    }
+
+    private func modelName(_ profile: EndpointProfile) -> String {
+        switch profile.kind {
+        case .openAICompatible:
+            return profile.openAI.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .volcengineStreaming:
+            return profile.volcengine.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    private func sourceSummary(_ profile: EndpointProfile) -> String {
+        let provider = profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎"
+        let model = modelName(profile)
+        return model.isEmpty ? provider : "\(provider) · \(model)"
+    }
+
+    private func credentialStatus(_ profile: EndpointProfile) -> (text: String, isSet: Bool) {
+        switch profile.kind {
+        case .openAICompatible:
+            if profile.openAI.authMode == .none { return ("无需密钥", true) }
+            return profile.apiKeyItemID == nil ? ("未设置", false) : ("••••••••", true)
+        case .volcengineStreaming:
+            if profile.volcengine.authMode == .apiKey {
+                return profile.apiKeyItemID == nil ? ("未设置", false) : ("••••••••", true)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            let hasBoth = profile.appKeyItemID != nil && profile.accessKeyItemID != nil
+            return hasBoth ? ("••••••••", true) : ("未设置", false)
         }
-    }
-
-    // MARK: - 数据
-
-    private func loadSelection() {
-        let id = settings.settings.activeProfileID ?? settings.settings.profiles.first?.id
-        selectedID = id
-        loadDraft()
-    }
-
-    private func loadDraft() {
-        guard let id = selectedID,
-              let profile = settings.settings.profiles.first(where: { $0.id == id })
-        else {
-            draft = nil
-            return
-        }
-        draft = profile
-        saveMessage = nil
-    }
-
-    private func addProfile(_ profile: EndpointProfile) {
-        settings.addProfile(profile)
-        selectedID = profile.id
-        loadDraft()
-    }
-
-    private func deleteSelected() {
-        guard let id = selectedID else { return }
-        settings.removeProfile(id: id)
-        selectedID = settings.settings.activeProfileID
-        loadDraft()
-    }
-
-    private func save(_ profile: EndpointProfile) {
-        let validation = profile.validation()
-        guard validation.isValid else {
-            saveMessage = validation.message
-            return
-        }
-        settings.updateActiveProfile(profile)
-        draft = profile
-        saveMessage = "已保存并设为当前端点 · \(Self.timeString())"
-    }
-
-    static func timeString() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: Date())
     }
 }
 
-/// 单端点编辑表单。secret 只在保存时写入 Keychain，界面不回显已保存的值。
+private struct ProviderBadge: View {
+    let kind: EndpointProfile.ProviderKind
+    var size: CGFloat = 26
+
+    var body: some View {
+        Image(systemName: kind == .openAICompatible ? "cloud.fill" : "waveform")
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(gradient, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+    }
+
+    private var gradient: LinearGradient {
+        if kind == .openAICompatible {
+            return LinearGradient(
+                colors: [Color(red: 0.32, green: 0.55, blue: 0.98), Color(red: 0.20, green: 0.36, blue: 0.90)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        return LinearGradient(
+            colors: [Color(red: 0.62, green: 0.40, blue: 0.98), Color(red: 0.44, green: 0.24, blue: 0.88)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+}
+
+private struct ProviderPickerSheet: View {
+    let onPick: (EndpointProfile.ProviderKind) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: EndpointProfile.ProviderKind = .openAICompatible
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("添加模型来源")
+                .font(.system(size: 18, weight: .semibold))
+
+            HStack(spacing: 10) {
+                providerCard(.openAICompatible)
+                providerCard(.volcengineStreaming)
+            }
+
+            Text(selected.summary)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 34, alignment: .topLeading)
+
+            HStack {
+                Spacer()
+                Button("取消") { dismiss() }
+                Button("继续") {
+                    onPick(selected)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(22)
+        .frame(width: 520)
+    }
+
+    private func providerCard(_ kind: EndpointProfile.ProviderKind) -> some View {
+        let isSelected = selected == kind
+        return Button {
+            selected = kind
+        } label: {
+            HStack(spacing: 10) {
+                ProviderBadge(kind: kind, size: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary)
+                    Text(kind == .openAICompatible ? "HTTP / multipart 转写" : "WebSocket 流式识别")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.45))
+            }
+            .padding(.horizontal, 13)
+            .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct EndpointEditorSheet: View {
+    @State private var draft: EndpointProfile
+    private let isNew: Bool
+    private let isActive: Bool
+    private let onSave: (EndpointProfile) -> Void
+    private let onCancel: () -> Void
+    @State private var showingTest = false
+
+    init(
+        profile: EndpointProfile,
+        isNew: Bool,
+        isActive: Bool,
+        onSave: @escaping (EndpointProfile) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        _draft = State(initialValue: profile)
+        self.isNew = isNew
+        self.isActive = isActive
+        self.onSave = onSave
+        self.onCancel = onCancel
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(isNew ? "添加模型来源" : "编辑模型来源")
+                    .font(.system(size: 16, weight: .semibold))
+                Spacer()
+                Button("取消") { onCancel() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            Divider()
+            EndpointEditorView(
+                draft: $draft,
+                isActive: isActive,
+                saveMessage: .constant(nil),
+                onSave: onSave,
+                onTest: { showingTest = true }
+            )
+        }
+        .frame(width: 680, height: 620)
+        .sheet(isPresented: $showingTest) {
+            EndpointTestView(profile: draft)
+        }
+    }
+}
+
 struct EndpointEditorView: View {
     @Binding var draft: EndpointProfile
     let isActive: Bool
