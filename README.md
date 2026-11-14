@@ -64,6 +64,7 @@
 - **自定义提示词**：添加自己的整理指令，保存为卡片随时切换。
 - **语言模型**：通用 OpenAI Chat Completions，以及 OpenCode Go 专用端点适配。
 - **个人词库**：术语 + 常见误写；作为识别提示（OpenAI prompt / 火山热词），并在本地替换误写。
+- **Rime 词库**：只读扫描 `~/Library/Rime` 的用户词典与 `custom_phrase.txt`，把高频多字词（默认上屏 ≥ 8 次，可在页面调整）导入为识别热词；不修改 Rime 文件，也不参与本地替换。
 - **失败不丢文本**：语言模型不可用时自动使用原文，并明确提示。
 </details>
 
@@ -117,7 +118,8 @@ xattr -dr com.apple.quarantine /Applications/Voxi.app
    - 填 Endpoint、model、API Key；
    - 点「获取模型列表…」勾选多个模型，调整来源/模型顺序。
 3. 可选：在 **设置 → 模型** 添加语言模型（通用 OpenAI / OpenCode Go），再到 **风格** 选择整理方式。
-4. 把光标放到任意输入框，按快捷键说话，再按一次结束。结果会自动输入。
+4. 可选：在 **设置 → 词库** 点「同步词条」，从 Rime 个人词库导入常用词作为识别提示。
+5. 把光标放到任意输入框，按快捷键说话，再按一次结束。结果会自动输入。
 
 看板会记录口述时间、字数、次数和近 7 天趋势；只存计数，不存文本。
 
@@ -153,7 +155,7 @@ xcodebuild test \
   -derivedDataPath build/DerivedData
 ```
 
-当前基线：202 项通过（2 项真实服务测试默认跳过）。
+当前基线：226 项测试（223 项通过，3 项按环境跳过：真实服务与辅助功能）。
 
 真实服务联调：
 
@@ -238,6 +240,6 @@ Voxi/
 
 ## 版本与许可证
 
-当前版本 `1.0.0`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
+当前版本 `1.0.1`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
 
 个人项目，仓库暂未附开源许可证。

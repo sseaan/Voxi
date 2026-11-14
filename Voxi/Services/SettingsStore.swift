@@ -12,6 +12,8 @@ struct VoxiSettings: Codable, Equatable {
     var autoInsertEnabled: Bool
     var showInterimTextInMenuBar: Bool
     var lexicon: PersonalLexicon
+    /// Rime 个人词库的只读导入设置。
+    var rime: RimeLexiconSettings
     /// 转写后的整理风格；nil 表示原文。
     var selectedStyleID: UUID?
     var customStyles: [TranscriptionStyle]
@@ -33,6 +35,7 @@ struct VoxiSettings: Codable, Equatable {
         autoInsertEnabled: Bool = true,
         showInterimTextInMenuBar: Bool = true,
         lexicon: PersonalLexicon = PersonalLexicon(),
+        rime: RimeLexiconSettings = RimeLexiconSettings(),
         selectedStyleID: UUID? = nil,
         customStyles: [TranscriptionStyle] = [],
         languageModel: LanguageModelProfile? = nil,
@@ -48,6 +51,7 @@ struct VoxiSettings: Codable, Equatable {
         self.autoInsertEnabled = autoInsertEnabled
         self.showInterimTextInMenuBar = showInterimTextInMenuBar
         self.lexicon = lexicon
+        self.rime = rime
         self.selectedStyleID = selectedStyleID
         self.customStyles = customStyles
         self.languageModel = languageModel
@@ -77,7 +81,7 @@ struct VoxiSettings: Codable, Equatable {
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
-             textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon,
+             textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon, rime,
              selectedStyleID, customStyles, languageModel, hasCompletedOnboarding, usage
     }
 
@@ -100,6 +104,7 @@ struct VoxiSettings: Codable, Equatable {
         autoInsertEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoInsertEnabled) ?? true
         showInterimTextInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showInterimTextInMenuBar) ?? true
         lexicon = try container.decodeIfPresent(PersonalLexicon.self, forKey: .lexicon) ?? PersonalLexicon()
+        rime = try container.decodeIfPresent(RimeLexiconSettings.self, forKey: .rime) ?? RimeLexiconSettings()
         selectedStyleID = try container.decodeIfPresent(UUID.self, forKey: .selectedStyleID)
         customStyles = try container.decodeIfPresent([TranscriptionStyle].self, forKey: .customStyles) ?? []
         languageModel = try container.decodeIfPresent(LanguageModelProfile.self, forKey: .languageModel)
@@ -121,6 +126,7 @@ struct VoxiSettings: Codable, Equatable {
         try container.encode(autoInsertEnabled, forKey: .autoInsertEnabled)
         try container.encode(showInterimTextInMenuBar, forKey: .showInterimTextInMenuBar)
         try container.encode(lexicon, forKey: .lexicon)
+        try container.encode(rime, forKey: .rime)
         try container.encodeIfPresent(selectedStyleID, forKey: .selectedStyleID)
         try container.encode(customStyles, forKey: .customStyles)
         try container.encodeIfPresent(languageModel, forKey: .languageModel)

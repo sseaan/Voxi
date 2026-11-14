@@ -43,6 +43,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(decoded.autoInsertEnabled)
         XCTAssertTrue(decoded.showInterimTextInMenuBar)
         XCTAssertFalse(decoded.profiles.isEmpty, "缺少 profiles 时应回落到默认 profile")
+        XCTAssertEqual(decoded.rime, RimeLexiconSettings(), "旧配置缺少 rime 时使用默认值")
         XCTAssertEqual(decoded.schemaVersion, 0, "旧配置缺少 schemaVersion 时按 0 读取，写出时升级")
 
         let reencoded = try JSONEncoder().encode(decoded)

@@ -329,3 +329,24 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 - MARKETING_VERSION 提升到 1.0.0。
 - 首次通过 GitHub Actions 构建 universal Release（ad-hoc 签名）并上传 GitHub Release。
 - 发布包包含 `Voxi.zip`、`manifest.txt` 和首次启动说明。
+
+## 第十五轮：Rime 个人词库导入（2026-11-15）
+
+- 词库页顶部新增「Rime 个人词库」卡片：显示目录、上次同步与来源统计，可修改 Rime 目录、最低上屏次数、是否导入自定义短语，并提供「同步词条 / 清除」与前 50 条热词预览。
+- 只读读取三类来源，不修改 Rime 用户目录：
+  1. `~/Library/Rime/*.userdb`：直接解析 LevelDB（SSTable + WAL），支持 snappy 压缩块；
+  2. `sync/<设备>/*.userdb.txt` 或根目录的用户词典快照；
+  3. `custom_phrase*.txt`。
+- 过滤规则：只保留 2–20 个字符的词条，排除单字、纯符号/数字、含 Rime 转义/占位符的词条；用户词典要求上屏次数达到阈值（默认 8，可在词库页调整）。统计、序列等内部词典（编码含 `/`）与元数据键会自动排除。
+- 排序：自定义短语优先（权重 → 含英文/数字 → 长度 → 文件顺序），其后按上屏次数；默认最多 300 条。
+- 导入结果写入 `PersonalLexicon.rimeTerms`，只作为识别提示（OpenAI prompt / 火山热词，分别取前 50 / 40 个）；**不参与本地误写替换**，避免几千条替换拖慢或改坏文本。手动词条不受「清除 Rime 热词」影响。
+- 设置新增 `VoxiSettings.rime`（目录、阈值、自定义短语开关、上次同步时间）；旧配置与旧词库 JSON 缺少新字段时按空导入状态迁移。
+- 测试：新增 LevelDB 读取（SSTable/log/snappy/删除标记）与 Rime 导入过滤、排序、快照合并、设置迁移用例；全量 226 项：223 项通过，3 项按环境跳过。
+
+## Voxi 1.0.1 发布（2026-11-15）
+
+- MARKETING_VERSION 提升到 1.0.1（build 2）。
+- 新增 Rime 个人词库导入：只读解析 `~/Library/Rime` 的 `*.userdb`（LevelDB + snappy）、同步快照与 `custom_phrase*.txt`，把多字词导入为识别热词；默认上屏门槛 8 次，可在词库页调整；不修改 Rime 文件，也不参与本地误写替换。
+- 词库页新增「Rime 个人词库」卡片；看板词库计数包含 Rime 热词；旧配置缺少新字段时按空导入状态迁移。
+- 测试：226 项，223 通过，3 项按环境跳过。
+- GitHub Actions 在推送 `v1.0.1` tag 后构建 universal Release（ad-hoc 签名）；本地自签名 Release 与 `dist/manifest.txt` 同步更新。

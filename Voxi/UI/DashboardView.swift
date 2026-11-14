@@ -21,7 +21,20 @@ struct DashboardView: View {
     private var points: [DailyCharacterPoint] { usage.dailyPoints(lastDays: 7, now: now) }
     private var weekCharacters: Int { points.reduce(0) { $0 + $1.characters } }
     private var candidates: [ASRModelCandidate] { settings.settings.asrCandidates }
-    private var lexiconCount: Int { settings.settings.lexicon.entries.count }
+    private var lexiconCount: Int {
+        settings.settings.lexicon.entries.count + settings.settings.lexicon.rimeTerms.count
+    }
+
+    private var rimeTermCount: Int { settings.settings.lexicon.rimeTerms.count }
+
+    private var lexiconDetailText: String {
+        if lexiconCount == 0 { return "还没有词条" }
+        let manual = settings.settings.lexicon.entries.count
+        if rimeTermCount > 0 {
+            return manual > 0 ? "手动词条 \(manual) · Rime 热词 \(rimeTermCount)" : "来自 Rime 的识别热词"
+        }
+        return "术语与常见误写"
+    }
 
     var body: some View {
         SettingsPage {
@@ -253,7 +266,7 @@ struct DashboardView: View {
                 icon: "character.book.closed.fill",
                 title: "个人词库",
                 value: "\(lexiconCount)",
-                detail: lexiconCount == 0 ? "还没有词条" : "术语与常见误写",
+                detail: lexiconDetailText,
                 actionTitle: "管理词库"
             ) {
                 onOpenTab(.lexicon)

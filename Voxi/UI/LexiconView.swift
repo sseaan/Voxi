@@ -26,7 +26,10 @@ struct LexiconView: View {
 
     var body: some View {
         SettingsPage(title: "个人词库") {
+            RimeLexiconCard(settings: settings)
+
             SettingsListCard(
+                "手动词条",
                 footer: "术语会作为识别提示；常见误写会在识别完成后自动替换成正确写法。词库只保存在本机。"
             ) {
                 HStack(spacing: 8) {

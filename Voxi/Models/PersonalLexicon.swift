@@ -20,30 +20,45 @@ struct LexiconEntry: Identifiable, Codable, Equatable {
 /// 个人词库：本地保存，不联网。用于两件事：
 /// 1. 作为识别提示（OpenAI-compatible 的 prompt / 火山流式的 corpus.context 热词）；
 /// 2. 识别完成后在本地把常见误听替换成正确写法。
+///
+/// 从 Rime 导入的词条只参与第 1 件事：它们是用户自己的常用词，量大且没有误写映射，
+/// 放进替换表既无收益又会拖慢识别后的文本处理。
 struct PersonalLexicon: Codable, Equatable {
+    /// 手动词条：参与识别提示和本地误写替换。
     var entries: [LexiconEntry]
+    /// Rime 导入的热词：只参与识别提示，手动词条优先。
+    var rimeTerms: [RimeLexiconTerm]
 
-    init(entries: [LexiconEntry] = []) {
+    init(entries: [LexiconEntry] = [], rimeTerms: [RimeLexiconTerm] = []) {
         self.entries = entries
+        self.rimeTerms = rimeTerms
     }
 
     var isEmpty: Bool {
-        entries.allSatisfy { LexiconEntry.normalized($0.term).isEmpty }
+        promptTerms.isEmpty
+    }
+
+    /// 识别提示用的词条：手动词条在前，Rime 热词在后，大小写不敏感去重。
+    var promptTerms: [String] {
+        var seen: Set<String> = []
+        var terms: [String] = []
+        for term in entries.map({ LexiconEntry.normalized($0.term) })
+            + rimeTerms.map({ LexiconEntry.normalized($0.term) }) {
+            guard !term.isEmpty else { continue }
+            guard seen.insert(term.lowercased()).inserted else { continue }
+            terms.append(term)
+        }
+        return terms
     }
 
     var promptHint: String? {
-        let terms = entries
-            .map { LexiconEntry.normalized($0.term) }
-            .filter { !$0.isEmpty }
-            .prefix(50)
+        let terms = promptTerms.prefix(50)
         return terms.isEmpty ? nil : terms.joined(separator: "、")
     }
 
     /// 火山 `corpus.context` 要求是转义后的 JSON 字符串。
     var hotwordsJSON: String? {
-        let words = entries
-            .map { LexiconEntry.normalized($0.term) }
-            .filter { !$0.isEmpty }
+        let words = promptTerms
             .prefix(40)
             .map { ["word": $0] }
         guard !words.isEmpty,
@@ -104,6 +119,11 @@ struct PersonalLexicon: Codable, Equatable {
         entries.removeAll { $0.id == id }
     }
 
+    /// 用一次 Rime 同步的结果整体替换旧热词；手动词条不受影响。
+    mutating func replaceRimeTerms(_ terms: [RimeLexiconTerm]) {
+        rimeTerms = terms
+    }
+
     /// 每行 `术语` 或 `术语=误听1,误听2`。
     @discardableResult
     mutating func importText(_ content: String) -> Int {
@@ -122,5 +142,18 @@ struct PersonalLexicon: Codable, Equatable {
             if entries.count > before { added += 1 }
         }
         return added
+    }
+
+    // MARK: - 兼容旧配置
+
+    private enum CodingKeys: String, CodingKey {
+        case entries, rimeTerms
+    }
+
+    /// 旧配置只有 `entries`；缺失 `rimeTerms` 时按空数组处理。
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        entries = try container.decodeIfPresent([LexiconEntry].self, forKey: .entries) ?? []
+        rimeTerms = try container.decodeIfPresent([RimeLexiconTerm].self, forKey: .rimeTerms) ?? []
     }
 }
