@@ -7,8 +7,8 @@
 # 也没有 notarization，Gatekeeper 首次启动仍可能需要用户手动批准。
 #
 # 用法：
-#   scripts/create-local-signing-identity.sh                       # 不存在时创建
-#   scripts/create-local-signing-identity.sh "Some Other Identity" # 指定名称
+#   scripts/setup/create-local-signing-identity.sh                       # 不存在时创建
+#   scripts/setup/create-local-signing-identity.sh "Some Other Identity" # 指定名称
 set -euo pipefail
 
 IDENTITY_NAME="${1:-Voxi Self-Signed Code Signing}"

@@ -17,6 +17,7 @@
 		209FB176BC28024B4A616A0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8037205209E246ED13395AF /* SettingsView.swift */; };
 		20CF732A0C98159EBD64099F /* AudioFileTranscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */; };
 		210AA12F42B9BC41ACEDBC6A /* TranscriptionStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB86C98F48A71BE267A2BC27 /* TranscriptionStyle.swift */; };
+		2125163FE44A045213C959B9 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65B02444E0468FC79901F637 /* LaunchAtLoginService.swift */; };
 		23CAAF0A556E5213CD150583 /* TextModeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */; };
 		259BE05EC900D52754C57961 /* OnboardingWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 562C0D83C7EDDC11FE5259FF /* OnboardingWindowController.swift */; };
 		2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */; };
@@ -51,7 +52,6 @@
 		AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */; };
 		AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */; };
 		B03E02AA4D0D0A13474F5C22 /* EndpointTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */; };
-		BCEE0CB6ED22E20EA4661CB8 /* LaunchAtLoginService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64CF2814F86D0101C00B5281 /* LaunchAtLoginService.swift */; };
 		BF6BF08F53F9F0E74DEFAB92 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */; };
 		C61058F545723555D70CA168 /* VolcengineWebSocketCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753BE72EC2BAE04088D177C4 /* VolcengineWebSocketCodec.swift */; };
 		CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */; };
@@ -114,7 +114,7 @@
 		5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiTests.swift; sourceTree = "<group>"; };
 		5F83CACA557A637645E3C50B /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
 		635FCC88AB1DB58299AD0802 /* ChatCompletionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionService.swift; sourceTree = "<group>"; };
-		64CF2814F86D0101C00B5281 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
+		65B02444E0468FC79901F637 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
 		6B71EBD7F82413F7869F0192 /* PersonalLexiconTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalLexiconTests.swift; sourceTree = "<group>"; };
 		6C819C7D57E572C842CA2968 /* RecordingMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingMode.swift; sourceTree = "<group>"; };
 		6CDBE6E17294DFD97106C0C7 /* RealServiceIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealServiceIntegrationTests.swift; sourceTree = "<group>"; };
@@ -182,6 +182,7 @@
 				F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */,
 				635FCC88AB1DB58299AD0802 /* ChatCompletionService.swift */,
 				A66E5B6D6978CD006477604B /* KeychainService.swift */,
+				65B02444E0468FC79901F637 /* LaunchAtLoginService.swift */,
 				3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */,
 				99076712E036C9926F2FF860 /* PermissionService.swift */,
 				00472D076D8FC8F3CFA9586C /* ProviderModelsService.swift */,
@@ -268,7 +269,6 @@
 				A27D706A15E2808D94A2587C /* Gzip.swift */,
 				41BCB971E6CFA8CF90864456 /* GzipShim.h */,
 				40FF2507C98B65F7B1B54B61 /* GzipShim.m */,
-				64CF2814F86D0101C00B5281 /* LaunchAtLoginService.swift */,
 				57C9E45456AA639B9D729E82 /* Logger.swift */,
 				C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */,
 				76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */,
@@ -432,7 +432,7 @@
 				1EB3DF67B59B4C9F2AFEF13F /* GzipShim.m in Sources */,
 				3B404FD53DF7832BB8468B0D /* KeychainService.swift in Sources */,
 				3C0C711BCCAF80A489213556 /* LanguageModelProfile.swift in Sources */,
-				BCEE0CB6ED22E20EA4661CB8 /* LaunchAtLoginService.swift in Sources */,
+				2125163FE44A045213C959B9 /* LaunchAtLoginService.swift in Sources */,
 				DD9B7087DF79F8746F2775ED /* LexiconView.swift in Sources */,
 				001C89F6AE536D0DA770C6A5 /* Logger.swift in Sources */,
 				ECC28055BF7ED75EB06026D7 /* MainMenuBuilder.swift in Sources */,

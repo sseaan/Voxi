@@ -1,6 +1,6 @@
 # Voxi 实施状态
 
-> 对应 `PLAN.md` 的分阶段实施结果。最后更新：2026-11-14 01:15。
+> 项目历史实施与变更记录。最后更新：2026-11-15。
 
 ## 环境
 
@@ -14,7 +14,7 @@
 | Phase | 内容 | 验证 |
 | --- | --- | --- |
 | 0.1 | Xcode 工程（Voxi + VoxiTests）、git、.gitignore | `xcodebuild -list`、Debug 构建、`git status` 不含 build/dist |
-| 0.2 | 自签名 identity 与 Manual 签名 | `scripts/create-local-signing-identity.sh`；`codesign --verify --deep --strict` 通过 |
+| 0.2 | 自签名 identity 与 Manual 签名 | `scripts/setup/create-local-signing-identity.sh`；`codesign --verify --deep --strict` 通过 |
 | 0.3 | 状态模型与设置持久化 | 单元测试覆盖状态流转、round-trip、旧配置迁移、无 secret 写入 UserDefaults；重启后 profile/Keychain 引用保留 |
 | 0.4 | 菜单栏、AppState、单一 AppCoordinator、设置窗口 | 实际点击验证开始/停止/设置/退出；重复开始不产生新 session |
 | 1.1 | 权限 | 首次录音触发系统麦克风授权框；拒绝路径、恢复按钮有测试与 UI |
@@ -31,7 +31,7 @@
 | 5.1 | Release 自签名构建 | `dist/Voxi.app` codesign 有效；`spctl` 本机 accepted（因本机信任该证书） |
 | 5.2 | 打包与首次启动 | `dist/Voxi.zip` + `README-FIRST-LAUNCH.txt` + `manifest.txt`；用户在干净环境完成 Gatekeeper 首次启动，无问题 |
 
-自动化测试：`xcodebuild test ...` 共 **148 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
+自动化测试：`xcodebuild test ...` 共 **196 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
 
 ## 本轮修复的问题
 
