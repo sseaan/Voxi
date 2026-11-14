@@ -455,4 +455,17 @@ final class VolcengineStreamingProviderTests: XCTestCase {
         }
         XCTAssertEqual(transport.connectCount, 0)
     }
+
+    func testInitializationIncludesLexiconHotwords() throws {
+        let lexicon = PersonalLexicon(entries: [LexiconEntry(term: "Voxi")])
+        let data = try VolcengineRequestBuilder.initializationJSON(
+            profile: makeProfile(),
+            textMode: TextMode(),
+            lexicon: lexicon
+        )
+        let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let request = try XCTUnwrap(root["request"] as? [String: Any])
+        let corpus = try XCTUnwrap(request["corpus"] as? [String: Any])
+        XCTAssertEqual(corpus["context"] as? String, lexicon.hotwordsJSON)
+    }
 }

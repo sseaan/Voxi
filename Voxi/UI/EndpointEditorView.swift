@@ -15,11 +15,10 @@ struct EndpointListView: View {
     }
 
     private var profiles: [EndpointProfile] { settings.settings.profiles }
-    private var activeProfile: EndpointProfile? { settings.activeProfile }
 
     var body: some View {
         SettingsPage(title: "模型") {
-            SettingsCard(
+            SettingsListCard(
                 "模型来源",
                 footer: "API Key 只保存在 macOS 钥匙串中；云端请求直接发往你填写的端点。"
             ) {
@@ -27,7 +26,7 @@ struct EndpointListView: View {
                     if index > 0 {
                         Divider().padding(.leading, 12).opacity(0.6)
                     }
-                    sourceRow(profile)
+                    sourceRow(profile, index: index)
                 }
                 Divider().padding(.leading, 12).opacity(0.6)
                 Button {
@@ -42,32 +41,27 @@ struct EndpointListView: View {
                 .buttonStyle(.plain)
             }
 
-            SettingsCard(
+            SettingsListCard(
                 "语音识别模型",
-                footer: "切换后下一次录音立即生效；当前只使用一个模型。"
+                footer: "按从上到下的顺序尝试；当前模型失败时自动切换到下一个，结束后立即插入结果。"
             ) {
-                activeModelRow
-                if profiles.count > 1 {
-                    Divider().padding(.leading, 12).opacity(0.6)
-                    HStack(spacing: 12) {
-                        Text("切换模型")
-                            .font(.system(size: 13))
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { activeProfile?.id ?? profiles[0].id },
-                            set: { activate($0) }
-                        )) {
-                            ForEach(profiles) { profile in
-                                Text(profile.name.isEmpty ? "未命名" : profile.name)
-                                    .tag(profile.id)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 220)
+                ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                    if index > 0 {
+                        Divider().padding(.leading, 12).opacity(0.6)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 9)
+                    modelRow(profile, index: index)
                 }
+                Divider().padding(.leading, 12).opacity(0.6)
+                Button {
+                    addingSource = true
+                } label: {
+                    Label("添加模型", systemImage: "plus")
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                }
+                .buttonStyle(.plain)
             }
         }
         .sheet(isPresented: $addingSource) {
@@ -117,7 +111,7 @@ struct EndpointListView: View {
         }
     }
 
-    private func sourceRow(_ profile: EndpointProfile) -> some View {
+    private func sourceRow(_ profile: EndpointProfile, index: Int) -> some View {
         HStack(spacing: 10) {
             ProviderBadge(kind: profile.kind, size: 26)
             VStack(alignment: .leading, spacing: 2) {
@@ -125,14 +119,15 @@ struct EndpointListView: View {
                     Text(profile.name.isEmpty ? "未命名来源" : profile.name)
                         .font(.system(size: 13))
                         .lineLimit(1)
-                    if profile.id == settings.settings.activeProfileID {
-                        Text("使用中")
-                            .font(.system(size: 9.5, weight: .medium))
-                            .foregroundStyle(.green)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.12), in: Capsule())
-                    }
+                    Text(index == 0 ? "首选" : "备用 \(index)")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(index == 0 ? Color.green : Color.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(
+                            (index == 0 ? Color.green : Color.secondary).opacity(0.12),
+                            in: Capsule()
+                        )
                 }
                 Text(sourceSummary(profile))
                     .font(.system(size: 11))
@@ -161,45 +156,72 @@ struct EndpointListView: View {
         .padding(.vertical, 9)
     }
 
-    @ViewBuilder
-    private var activeModelRow: some View {
-        if let active = activeProfile {
-            HStack(spacing: 10) {
-                Text("1")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
-                    .background(Color.secondary.opacity(0.12), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(modelName(active).isEmpty ? "未填写模型" : modelName(active))
-                        .font(.system(size: 13))
-                    Text(active.name.isEmpty ? "未命名来源" : active.name)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 12)
-                Button("测试") {
-                    testingProfile = active
-                }
-                .controlSize(.small)
-                Label("使用中", systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.green)
-                    .labelStyle(.titleAndIcon)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 9)
-        } else {
-            Text("尚未选择模型")
-                .font(.system(size: 12))
+    private func modelRow(_ profile: EndpointProfile, index: Int) -> some View {
+        HStack(spacing: 10) {
+            Text("\(index + 1)")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
+                .frame(width: 20, height: 20)
+                .background(Color.secondary.opacity(0.12), in: Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(modelName(profile).isEmpty ? "未填写模型" : modelName(profile))
+                    .font(.system(size: 13))
+                    .lineLimit(1)
+                Text("\(profile.name.isEmpty ? "未命名来源" : profile.name) · \(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎")")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Button {
+                testingProfile = profile
+            } label: {
+                Image(systemName: "bolt.horizontal.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("测试这个模型")
+            Button {
+                move(index, offset: -1)
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(index == 0 ? Color.secondary.opacity(0.3) : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(index == 0)
+            .help("提高优先级")
+            Button {
+                move(index, offset: 1)
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(index == profiles.count - 1 ? Color.secondary.opacity(0.3) : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(index == profiles.count - 1)
+            .help("降低优先级")
+            Button {
+                pendingDelete = profile
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .disabled(profiles.count <= 1)
+            .help("删除模型")
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
     }
 
-    private func activate(_ id: UUID) {
-        settings.settings.activeProfileID = id
+    private func move(_ index: Int, offset: Int) {
+        let target = index + offset
+        guard profiles.indices.contains(index), profiles.indices.contains(target) else { return }
+        var updated = profiles
+        updated.swapAt(index, target)
+        settings.settings.profiles = updated
+        settings.settings.activeProfileID = updated.first?.id
     }
 
     private func deleteSecrets(of profile: EndpointProfile) {
@@ -218,9 +240,7 @@ struct EndpointListView: View {
         } else {
             settings.settings.profiles.append(profile)
         }
-        if isNew || settings.settings.activeProfileID == profile.id {
-            settings.settings.activeProfileID = profile.id
-        }
+        settings.settings.activeProfileID = settings.settings.profiles.first?.id
     }
 
     private func modelName(_ profile: EndpointProfile) -> String {
@@ -380,7 +400,7 @@ private struct EndpointEditorSheet: View {
         VStack(spacing: 0) {
             HStack {
                 Text(isNew ? "添加模型来源" : "编辑模型来源")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                 Spacer()
                 Button("取消") { onCancel() }
                     .keyboardShortcut(.cancelAction)
@@ -391,6 +411,7 @@ private struct EndpointEditorSheet: View {
             EndpointEditorView(
                 draft: $draft,
                 isActive: isActive,
+                showsHeader: false,
                 saveMessage: .constant(nil),
                 onSave: onSave,
                 onTest: { showingTest = true }
@@ -406,6 +427,7 @@ private struct EndpointEditorSheet: View {
 struct EndpointEditorView: View {
     @Binding var draft: EndpointProfile
     let isActive: Bool
+    var showsHeader = true
     @Binding var saveMessage: String?
     let onSave: (EndpointProfile) -> Void
     let onTest: () -> Void
@@ -422,7 +444,9 @@ struct EndpointEditorView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    header
+                    if showsHeader {
+                        header
+                    }
                     generalCard
                     if draft.kind == .openAICompatible {
                         openAICard
@@ -464,14 +488,14 @@ struct EndpointEditorView: View {
     // MARK: - 基本信息
 
     private var generalCard: some View {
-        SettingsCard("基本信息") {
-            SettingsRow("名称") {
+        SettingsListCard("基本信息") {
+            SettingsFieldRow("名称") {
                 TextField("例如：公司内网 / 火山豆包", text: $draft.name)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 320)
             }
-
-            SettingsRow("服务类型") {
+            SettingsDivider()
+            SettingsFieldRow("服务类型") {
                 Picker("", selection: Binding(
                     get: { draft.kind },
                     set: { newKind in
@@ -491,18 +515,18 @@ struct EndpointEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 320)
+                .frame(width: 300)
             }
-
-            SettingsRow(
+            SettingsDivider()
+            SettingsFieldRow(
                 "Endpoint",
-                caption: draft.kind == .openAICompatible
+                subtitle: draft.kind == .openAICompatible
                     ? "HTTPS；仅本机 loopback 可在下方明确允许 HTTP。Voxi 不会替换你填写的路径。"
                     : "WebSocket（wss://）。可填写控制台实际开通的兼容地址。"
             ) {
                 TextField("完整 URL", text: $draft.endpointURL)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
             }
         }
     }
@@ -510,64 +534,80 @@ struct EndpointEditorView: View {
     // MARK: - OpenAI-compatible
 
     private var openAICard: some View {
-        SettingsCard("OpenAI-compatible") {
-            SettingsRow("model", caption: "必填；不同服务的模型名不同。") {
+        SettingsListCard("OpenAI-compatible") {
+            SettingsFieldRow("model", subtitle: "必填；不同服务的模型名不同。") {
                 TextField("例如 whisper-1 / sensevoice", text: $draft.openAI.model)
                     .textFieldStyle(.roundedBorder)
                     .frame(maxWidth: 260)
             }
-
-            SettingsRow("鉴权方式") {
+            SettingsDivider()
+            SettingsFieldRow("鉴权方式") {
                 Picker("", selection: $draft.openAI.authMode) {
                     ForEach(EndpointProfile.OpenAIOptions.AuthMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .fixedSize()
             }
-
             if draft.openAI.authMode == .customHeader {
-                SettingsRow("Header 名") {
+                SettingsDivider()
+                SettingsFieldRow("Header 名") {
                     TextField("例如 api-key", text: $draft.openAI.customAuthHeaderName)
                         .textFieldStyle(.roundedBorder)
-                        .frame(maxWidth: 260)
+                        .frame(width: 200)
                 }
             }
-
-            SettingsRow("API Key", caption: "保存到 Keychain；界面不回显已保存的密钥。更新后首次读取可能需要在系统对话框中选择“始终允许”。") {
-                secretInput(
-                    text: $apiKeyInput,
-                    hasExisting: draft.apiKeyItemID != nil
-                )
+            SettingsDivider()
+            SettingsFieldRow(
+                "API Key",
+                subtitle: "保存到 Keychain；更新后首次读取可能需要选择“始终允许”。"
+            ) {
+                secretInput(text: $apiKeyInput, hasExisting: draft.apiKeyItemID != nil)
             }
-
-            SettingsRow("响应格式") {
+            SettingsDivider()
+            SettingsFieldRow("响应格式") {
                 Picker("", selection: $draft.openAI.responseFormat) {
                     ForEach(EndpointProfile.OpenAIOptions.ResponseFormat.allCases) { format in
                         Text(format.displayName).tag(format)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 260)
+                .fixedSize()
             }
-
-            SettingsRow("超时") {
+            SettingsDivider()
+            SettingsFieldRow("超时") {
                 HStack(spacing: 6) {
                     TextField("60", value: $draft.openAI.timeoutSeconds, format: .number)
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 80)
-                    Text("秒").foregroundStyle(.secondary)
+                        .frame(width: 70)
+                    Text("秒")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            Divider()
-
-            Toggle("发送 language 字段", isOn: $draft.openAI.sendsLanguageField)
-            Toggle("发送 prompt 字段", isOn: $draft.openAI.sendsPromptField)
-
+            SettingsDivider()
+            SettingsFieldRow("发送 language 字段") {
+                Toggle("", isOn: $draft.openAI.sendsLanguageField)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+            SettingsDivider()
+            SettingsFieldRow("发送 prompt 字段") {
+                Toggle("", isOn: $draft.openAI.sendsPromptField)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
             if draft.isLoopbackEndpoint {
-                Toggle("允许对本机地址使用明文 HTTP", isOn: $draft.openAI.allowsInsecureLocalHTTP)
+                SettingsDivider()
+                SettingsFieldRow("允许本机明文 HTTP", subtitle: "仅对 loopback 地址生效") {
+                    Toggle("", isOn: $draft.openAI.allowsInsecureLocalHTTP)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
+                }
             }
         }
     }
@@ -645,47 +685,52 @@ struct EndpointEditorView: View {
     // MARK: - 火山
 
     private var volcengineCard: some View {
-        SettingsCard("火山引擎豆包流式识别") {
-            SettingsRow(
-                "鉴权模式",
-                caption: "新版与旧版凭据不能混用。"
-            ) {
+        SettingsListCard("火山引擎豆包流式识别") {
+            SettingsFieldRow("鉴权模式", subtitle: "新版与旧版凭据不能混用。") {
                 Picker("", selection: $draft.volcengine.authMode) {
                     ForEach(EndpointProfile.VolcengineOptions.AuthMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
                 .labelsHidden()
-                .frame(width: 300)
+                .fixedSize()
             }
-
             switch draft.volcengine.authMode {
             case .apiKey:
-                SettingsRow("API Key", caption: "保存到 Keychain；界面不回显已保存的密钥。更新后首次读取可能需要在系统对话框中选择“始终允许”。") {
+                SettingsDivider()
+                SettingsFieldRow(
+                    "API Key",
+                    subtitle: "保存到 Keychain；更新后首次读取可能需要选择“始终允许”。"
+                ) {
                     secretInput(text: $apiKeyInput, hasExisting: draft.apiKeyItemID != nil)
                 }
             case .legacy:
-                SettingsRow("App Key") {
+                SettingsDivider()
+                SettingsFieldRow("App Key") {
                     secretInput(text: $appKeyInput, hasExisting: draft.appKeyItemID != nil)
                 }
-                SettingsRow("Access Key") {
+                SettingsDivider()
+                SettingsFieldRow("Access Key") {
                     secretInput(text: $accessKeyInput, hasExisting: draft.accessKeyItemID != nil)
                 }
             }
-
-            SettingsRow("Resource ID", caption: "与账号已开通的资源一致，例如 volc.seedasr.sauc.duration。") {
+            SettingsDivider()
+            SettingsFieldRow(
+                "Resource ID",
+                subtitle: "与账号已开通的资源一致，例如 volc.seedasr.sauc.duration。"
+            ) {
                 TextField("volc.seedasr.sauc.duration", text: $draft.volcengine.resourceID)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(.body, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
             }
-
-            SettingsRow("model_name") {
+            SettingsDivider()
+            SettingsFieldRow("model_name") {
                 TextField("bigmodel", text: $draft.volcengine.modelName)
                     .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
+                    .frame(width: 160)
             }
-
-            SettingsRow("结果类型") {
+            SettingsDivider()
+            SettingsFieldRow("结果类型") {
                 Picker("", selection: $draft.volcengine.resultType) {
                     ForEach(EndpointProfile.VolcengineOptions.ResultType.allCases) { type in
                         Text(type.displayName).tag(type)
@@ -693,10 +738,18 @@ struct EndpointEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 220)
+                .frame(width: 200)
             }
-
-            Toggle("发送 X-Api-Sequence header（按所选 v3 接口要求）", isOn: $draft.volcengine.sendsApiSequenceHeader)
+            SettingsDivider()
+            SettingsFieldRow(
+                "X-Api-Sequence",
+                subtitle: "按所选 v3 接口要求发送"
+            ) {
+                Toggle("", isOn: $draft.volcengine.sendsApiSequenceHeader)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
         }
     }
 

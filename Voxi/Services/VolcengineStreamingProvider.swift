@@ -45,7 +45,8 @@ final class VolcengineStreamingProvider: TranscriptionProvider {
         )
         let initializationJSON = try VolcengineRequestBuilder.initializationJSON(
             profile: profile,
-            textMode: options.textMode
+            textMode: options.textMode,
+            lexicon: options.lexicon
         )
 
         let mode: VolcengineTranscriptAccumulator.Mode = profile.volcengine.resultType == .full ? .full : .single
@@ -133,7 +134,11 @@ enum VolcengineRequestBuilder {
     }
 
     /// 初始化 JSON（full client request payload）。
-    static func initializationJSON(profile: EndpointProfile, textMode: TextMode) throws -> Data {
+    static func initializationJSON(
+        profile: EndpointProfile,
+        textMode: TextMode,
+        lexicon: PersonalLexicon = PersonalLexicon()
+    ) throws -> Data {
         let audio: [String: Any] = [
             "format": "pcm",
             "codec": "raw",
@@ -142,13 +147,16 @@ enum VolcengineRequestBuilder {
             "channel": 1,
             "language": textMode.language.volcengineLanguage
         ]
-        let request: [String: Any] = [
+        var request: [String: Any] = [
             "model_name": profile.volcengine.modelName,
             "result_type": profile.volcengine.resultType.requestValue,
             "enable_punc": textMode.addPunctuation,
             "enable_itn": true,
             "show_utterances": true
         ]
+        if let hotwords = lexicon.hotwordsJSON {
+            request["corpus"] = ["context": hotwords]
+        }
         let root: [String: Any] = [
             "user": ["uid": UUID().uuidString],
             "audio": audio,

@@ -3,8 +3,9 @@ import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
-    case text
     case endpoints
+    case text
+    case lexicon
     case about
 
     var id: String { rawValue }
@@ -12,8 +13,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "通用"
-        case .text: return "文本"
         case .endpoints: return "模型"
+        case .text: return "文本"
+        case .lexicon: return "词库"
         case .about: return "关于"
         }
     }
@@ -21,8 +23,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .general: return "gearshape.fill"
-        case .text: return "textformat"
         case .endpoints: return "square.stack.3d.up.fill"
+        case .text: return "textformat"
+        case .lexicon: return "character.book.closed.fill"
         case .about: return "info.circle.fill"
         }
     }
@@ -30,8 +33,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     var iconColor: Color {
         switch self {
         case .general: return Color(red: 0.42, green: 0.48, blue: 0.56)
-        case .text: return Color(red: 0.56, green: 0.45, blue: 0.86)
         case .endpoints: return Color(red: 0.33, green: 0.47, blue: 0.92)
+        case .text: return Color(red: 0.56, green: 0.45, blue: 0.86)
+        case .lexicon: return Color(red: 0.95, green: 0.61, blue: 0.19)
         case .about: return Color(red: 0.52, green: 0.56, blue: 0.62)
         }
     }
@@ -147,6 +151,85 @@ struct SettingsCard<Content: View>: View {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
             )
+            if let footer {
+                Text(footer)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// OpenVoice 风格的设置行：左侧标题/说明，右侧控件，行本身负责 12/9 内边距。
+struct SettingsFieldRow<Trailing: View>: View {
+    var title: String
+    var subtitle: String?
+    @ViewBuilder var trailing: Trailing
+
+    init(_ title: String, subtitle: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 12)
+            trailing
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+}
+
+struct SettingsDivider: View {
+    var body: some View {
+        Divider().padding(.leading, 12).opacity(0.6)
+    }
+}
+
+/// 连续行卡片：行之间用分隔线，内边距由行自己负责（OpenVoice 的 SettingsCard 语义）。
+struct SettingsListCard<Content: View>: View {
+    var title: String?
+    var footer: String?
+    @ViewBuilder var content: Content
+
+    init(_ title: String? = nil, footer: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.footer = footer
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let title {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 10)
+            }
+            VStack(spacing: 0) { content }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    Color(nsColor: .controlBackgroundColor),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+                )
             if let footer {
                 Text(footer)
                     .font(.system(size: 11))

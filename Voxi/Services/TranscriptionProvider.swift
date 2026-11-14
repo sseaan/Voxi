@@ -12,6 +12,8 @@ struct TranscriptionOptions {
     var audioDuration: TimeInterval?
     /// 文件转写等长任务可覆盖端点默认超时。
     var requestTimeout: TimeInterval? = nil
+    /// 个人词库：作为识别提示，并在本地修正常见误听。
+    var lexicon: PersonalLexicon = PersonalLexicon()
 }
 
 /// ASR provider 统一边界。两种协议的网络交互不同，但都通过这个接口对协调器暴露。

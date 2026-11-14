@@ -11,6 +11,7 @@ struct VoxiSettings: Codable, Equatable {
     var textMode: TextMode
     var autoInsertEnabled: Bool
     var showInterimTextInMenuBar: Bool
+    var lexicon: PersonalLexicon
 
     static let currentSchemaVersion = 1
 
@@ -22,7 +23,8 @@ struct VoxiSettings: Codable, Equatable {
         shortcut: ShortcutConfiguration = .default,
         textMode: TextMode = TextMode(),
         autoInsertEnabled: Bool = true,
-        showInterimTextInMenuBar: Bool = true
+        showInterimTextInMenuBar: Bool = true,
+        lexicon: PersonalLexicon = PersonalLexicon()
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
@@ -32,6 +34,7 @@ struct VoxiSettings: Codable, Equatable {
         self.textMode = textMode
         self.autoInsertEnabled = autoInsertEnabled
         self.showInterimTextInMenuBar = showInterimTextInMenuBar
+        self.lexicon = lexicon
     }
 
     /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
@@ -39,16 +42,16 @@ struct VoxiSettings: Codable, Equatable {
         [.defaultOpenAIProfile()]
     }
 
+    /// 首选模型 = 回退链的第一个。`activeProfileID` 仅用于旧配置迁移。
     var activeProfile: EndpointProfile? {
-        guard let activeProfileID else { return profiles.first }
-        return profiles.first { $0.id == activeProfileID } ?? profiles.first
+        profiles.first
     }
 
     // MARK: - 迁移
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
-             textMode, autoInsertEnabled, showInterimTextInMenuBar
+             textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon
     }
 
     /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
@@ -58,13 +61,18 @@ struct VoxiSettings: Codable, Equatable {
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 0
         let storedProfiles = try container.decodeIfPresent([EndpointProfile].self, forKey: .profiles) ?? []
         profiles = storedProfiles.isEmpty ? defaults.profiles : storedProfiles
-        activeProfileID = try container.decodeIfPresent(UUID.self, forKey: .activeProfileID)
-            ?? profiles.first?.id
+        let storedActive = try container.decodeIfPresent(UUID.self, forKey: .activeProfileID)
+        // 旧版本只有一个“当前模型”：迁移时把它放到回退链首位。
+        if let storedActive, let index = profiles.firstIndex(where: { $0.id == storedActive }), index > 0 {
+            profiles.insert(profiles.remove(at: index), at: 0)
+        }
+        activeProfileID = profiles.first?.id
         recordingMode = try container.decodeIfPresent(RecordingMode.self, forKey: .recordingMode) ?? .holdToTalk
         shortcut = try container.decodeIfPresent(ShortcutConfiguration.self, forKey: .shortcut) ?? .default
         textMode = try container.decodeIfPresent(TextMode.self, forKey: .textMode) ?? TextMode()
         autoInsertEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoInsertEnabled) ?? true
         showInterimTextInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showInterimTextInMenuBar) ?? true
+        lexicon = try container.decodeIfPresent(PersonalLexicon.self, forKey: .lexicon) ?? PersonalLexicon()
     }
 
     func encode(to encoder: Encoder) throws {
@@ -77,6 +85,7 @@ struct VoxiSettings: Codable, Equatable {
         try container.encode(textMode, forKey: .textMode)
         try container.encode(autoInsertEnabled, forKey: .autoInsertEnabled)
         try container.encode(showInterimTextInMenuBar, forKey: .showInterimTextInMenuBar)
+        try container.encode(lexicon, forKey: .lexicon)
     }
 }
 

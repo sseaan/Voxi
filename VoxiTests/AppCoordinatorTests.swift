@@ -127,6 +127,23 @@ final class FakeTranscriptionProvider: TranscriptionProvider {
 }
 
 @MainActor
+final class SequencedTranscriptionProvider: TranscriptionProvider {
+    let kind: EndpointProfile.ProviderKind = .openAICompatible
+    private var sessions: [FakeTranscriptionSession]
+    private(set) var makeSessionCallCount = 0
+
+    init(sessions: [FakeTranscriptionSession]) {
+        self.sessions = sessions
+    }
+
+    func makeSession(profile: EndpointProfile, options: TranscriptionOptions) async throws -> any TranscriptionSession {
+        makeSessionCallCount += 1
+        guard !sessions.isEmpty else { throw TranscriptionError.network("没有更多会话") }
+        return sessions.removeFirst()
+    }
+}
+
+@MainActor
 final class FakeTextInserter: TextInserting {
     var outcome: TextInsertionOutcome = .inserted(via: .pasteboard)
     private(set) var insertions: [(text: String, pid: pid_t?)] = []
@@ -666,5 +683,84 @@ final class AppCoordinatorTests: XCTestCase {
             MenuBarView.recoveryTitle(.copyTranscript("hi")),
             "复制识别结果"
         )
+    }
+
+    // MARK: - 多模型自动回退
+
+    func testFallsBackToNextModelWhenSessionCreationFails() async {
+        let failing = FakeTranscriptionProvider(kind: .volcengineStreaming)
+        failing.makeSessionError = TranscriptionError.network("连接失败")
+        let working = FakeTranscriptionProvider(kind: .openAICompatible)
+        let capture = StubAudioCapture()
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let multiStore = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        multiStore.settings.profiles = [.defaultVolcengineProfile(), .defaultOpenAIProfile()]
+        let multiState = AppState()
+        let multi = AppCoordinator(
+            settings: multiStore,
+            appState: multiState,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: capture,
+            providers: [failing, working],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
+        )
+
+        multi.startRecording()
+        await waitFor { multiState.state == .recording }
+        XCTAssertEqual(failing.makeSessionCallCount, 1)
+        XCTAssertEqual(working.makeSessionCallCount, 1)
+        XCTAssertEqual(multiState.state, .recording)
+    }
+
+    func testFallsBackToNextProfileWhenFinishFails() async {
+        let failingSession = FakeTranscriptionSession()
+        failingSession.finishError = TranscriptionError.serverError(status: 500, detail: "boom")
+        let backupSession = FakeTranscriptionSession(resultText: "备用模型结果")
+        let provider = SequencedTranscriptionProvider(sessions: [failingSession, backupSession])
+
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        store.settings.profiles = [.defaultOpenAIProfile(), .defaultOpenAIProfile()]
+        store.settings.autoInsertEnabled = false
+        let state = AppState()
+        let coordinator = AppCoordinator(
+            settings: store,
+            appState: state,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: StubAudioCapture(),
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
+        )
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle || state.state == .failed }
+
+        XCTAssertEqual(state.state, .idle)
+        XCTAssertEqual(state.lastResult?.text, "备用模型结果")
+        XCTAssertGreaterThan(backupSession.finishCallCount, 0)
+        XCTAssertEqual(provider.makeSessionCallCount, 2)
+    }
+
+    func testLexiconAliasIsAppliedToFinalResult() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "voxy 你好"
+        let (coordinator, store, state, _) = makeCoordinator(provider: provider)
+        store.settings.lexicon.add(term: "Voxi", aliases: ["voxy"])
+        store.settings.autoInsertEnabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle }
+
+        XCTAssertEqual(state.lastResult?.text, "Voxi 你好")
     }
 }

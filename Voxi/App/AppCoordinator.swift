@@ -43,6 +43,13 @@ final class AppCoordinator: ObservableObject {
     /// 快捷键触发时记录的前台应用 PID；输入前必须仍然一致。
     private var targetApplicationPID: pid_t?
 
+    /// 本次录音开始时锁定的模型链（按优先级）；中途改设置不影响本次。
+    private var sessionProfiles: [EndpointProfile] = []
+    private var attemptedProfileIDs: Set<UUID> = []
+    private var activeSessionProfile: EndpointProfile?
+    /// 流式模型中途断开：继续录音，结束后用备用模型转写。
+    private var streamingFailed = false
+
     init(
         settings: SettingsStore,
         appState: AppState,
@@ -173,11 +180,16 @@ final class AppCoordinator: ObservableObject {
             Logger.app.debug("忽略重复的开始录音请求，当前状态 \(self.appState.state.rawValue, privacy: .public)")
             return
         }
-        guard let profile = settings.activeProfile else {
-            appState.present(error: AppError(message: "尚未配置识别端点，请先在设置中添加。"))
+        let usableProfiles = settings.settings.profiles
+        guard let profile = usableProfiles.first else {
+            appState.present(error: AppError(message: "尚未配置可用的识别模型，请先在设置 → 模型中完善配置。"))
             transition(to: .failed)
             return
         }
+        sessionProfiles = usableProfiles
+        attemptedProfileIDs = []
+        activeSessionProfile = nil
+        streamingFailed = false
 
         if appState.state == .failed {
             // 失败状态必须先回到 idle 才能开始新的 session。
@@ -296,13 +308,8 @@ final class AppCoordinator: ObservableObject {
             cancelCurrentSession()
             return
         }
-        guard let profile = settings.activeProfile else {
-            appState.present(error: AppError(message: "尚未配置识别端点，请先在设置中添加。"))
-            transition(to: .failed)
-            return
-        }
-        guard let provider = providers[profile.kind] else {
-            appState.present(error: AppError(message: TranscriptionError.unsupportedProvider(profile.kind).localizedDescription))
+        guard let firstProfile = sessionProfiles.first else {
+            appState.present(error: AppError(message: "没有可用的识别模型。"))
             transition(to: .failed)
             return
         }
@@ -310,11 +317,12 @@ final class AppCoordinator: ObservableObject {
         let options = TranscriptionOptions(
             sessionID: sessionID,
             textMode: settings.settings.textMode,
-            audioDuration: nil
+            audioDuration: nil,
+            lexicon: settings.settings.lexicon
         )
 
-        // 火山需要先建连并发送初始化帧；连接期间仍然先开始采集并缓冲音频。
-        if profile.kind == .volcengineStreaming {
+        // 第一个模型是流式时先显示“连接”；OpenAI-compatible 会话创建是即时的。
+        if firstProfile.kind == .volcengineStreaming {
             transition(to: .connecting)
         }
 
@@ -324,23 +332,40 @@ final class AppCoordinator: ObservableObject {
                 try await self.startAudioCapture(sessionID: sessionID)
                 Logger.app.debug("采集已启动（状态=\(self.appState.state.rawValue, privacy: .public)）")
 
-                let session = try await provider.makeSession(profile: profile, options: options)
-                Logger.app.debug("ASR 会话就绪（状态=\(self.appState.state.rawValue, privacy: .public)）")
-                guard self.currentSessionID == sessionID,
-                      self.appState.state == .requestingPermission || self.appState.state == .connecting
-                else {
-                    await session.cancel()
-                    return
+                var attempts: [String] = []
+                for profile in self.sessionProfiles {
+                    guard let provider = self.providers[profile.kind] else { continue }
+                    self.attemptedProfileIDs.insert(profile.id)
+                    do {
+                        let session = try await provider.makeSession(profile: profile, options: options)
+                        guard self.currentSessionID == sessionID,
+                              self.appState.state == .requestingPermission || self.appState.state == .connecting
+                        else {
+                            await session.cancel()
+                            return
+                        }
+                        self.transcriptionSession = session
+                        self.activeSessionProfile = profile
+                        Logger.app.debug("ASR 会话就绪 provider=\(profile.kind.rawValue, privacy: .public) model=\(profile.name, privacy: .public)")
+                        self.observeUpdates(session: session, sessionID: sessionID)
+                        // 立即补发连接期间缓冲的音频，不必等下一个分片。
+                        await self.flushPendingAudio(into: session)
+                        self.transition(to: .recording, startedAt: self.captureStartedAt ?? Date())
+                        if self.stopRequestedWhileConnecting {
+                            self.stopRequestedWhileConnecting = false
+                            self.stopRecording()
+                        }
+                        return
+                    } catch {
+                        let name = profile.name.isEmpty ? profile.kind.displayName : profile.name
+                        attempts.append("\(name)：\(error.localizedDescription)")
+                        Logger.app.error("模型「\(profile.name, privacy: .public)」连接失败，尝试下一个：\(String(describing: error), privacy: .public)")
+                    }
                 }
-                self.transcriptionSession = session
-                self.observeUpdates(session: session, sessionID: sessionID)
-                // 立即补发连接期间缓冲的音频，不必等下一个分片。
-                await self.flushPendingAudio(into: session)
-                self.transition(to: .recording, startedAt: self.captureStartedAt ?? Date())
-                if self.stopRequestedWhileConnecting {
-                    self.stopRequestedWhileConnecting = false
-                    self.stopRecording()
-                }
+                self.failStart(
+                    AllModelsFailedError(attempts: attempts),
+                    sessionID: sessionID
+                )
             } catch {
                 self?.failStart(error, sessionID: sessionID)
             }
@@ -455,23 +480,29 @@ final class AppCoordinator: ObservableObject {
         audioTask = nil
         stopRequestedWhileConnecting = false
 
-        guard currentSessionID == sessionID, let session = transcriptionSession else {
+        guard let sessionID, currentSessionID == sessionID else {
             AudioCaptureService.removeRecording(at: metadata.fileURL)
             return
         }
 
-        await flushPendingAudio(into: session)
+        if let session = transcriptionSession, !streamingFailed {
+            await flushPendingAudio(into: session)
+        }
         appState.setInterimText("")
         transition(to: .transcribing)
         let optionsDuration = metadata.duration
         Logger.app.info("录音结束 duration=\(String(format: "%.2f", optionsDuration), privacy: .public)s，开始识别")
 
         do {
-            let result = try await session.finish(recordingURL: metadata.fileURL)
+            let result = try await transcribeWithFallback(
+                wavURL: metadata.fileURL,
+                duration: metadata.duration,
+                sessionID: sessionID
+            )
             AudioCaptureService.removeRecording(at: metadata.fileURL)
 
             guard currentSessionID == sessionID else {
-                Logger.app.debug("丢弃迟到的识别结果 session=\(sessionID?.uuidString ?? "nil", privacy: .public)")
+                Logger.app.debug("丢弃迟到的识别结果 session=\(sessionID.uuidString, privacy: .public)")
                 return
             }
             transcriptionSession = nil
@@ -479,7 +510,9 @@ final class AppCoordinator: ObservableObject {
             updatesTask = nil
             appState.setInterimText("")
 
-            let finalText = settings.settings.textMode.finalize(result.text)
+            let finalText = settings.settings.textMode.finalize(
+                settings.settings.lexicon.replacing(in: result.text)
+            )
             var storedResult = result
             storedResult.text = finalText
             appState.setLastResult(storedResult)
@@ -519,7 +552,9 @@ final class AppCoordinator: ObservableObject {
             updatesTask = nil
             appState.setInterimText("")
 
-            if let transcriptionError = error as? TranscriptionError, transcriptionError.isCancellation {
+            if error is CancellationError
+                || (error as? TranscriptionError)?.isCancellation == true
+                || appState.state == .cancelling {
                 transition(to: .idle)
                 return
             }
@@ -527,6 +562,94 @@ final class AppCoordinator: ObservableObject {
             appState.present(error: AppError(message: error.localizedDescription))
             transition(to: .failed)
         }
+    }
+
+    /// 先结束当前会话；失败/空结果时按优先级用剩余模型重跑整段录音。
+    private func transcribeWithFallback(
+        wavURL: URL,
+        duration: TimeInterval,
+        sessionID: UUID
+    ) async throws -> TranscriptionResult {
+        var attempts: [String] = []
+
+        if !streamingFailed, let session = transcriptionSession, let profile = activeSessionProfile {
+            do {
+                let result = try await session.finish(recordingURL: wavURL)
+                if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return result
+                }
+                attempts.append("\(displayName(profile))：返回空结果")
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                attempts.append("\(displayName(profile))：\(error.localizedDescription)")
+            }
+            transcriptionSession = nil
+            updatesTask?.cancel()
+            updatesTask = nil
+        }
+
+        for profile in sessionProfiles where !attemptedProfileIDs.contains(profile.id) {
+            try Task.checkCancellation()
+            guard currentSessionID == sessionID else { throw CancellationError() }
+            attemptedProfileIDs.insert(profile.id)
+            do {
+                let result = try await transcribeRecordedFile(
+                    wavURL,
+                    profile: profile,
+                    duration: duration
+                )
+                if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Logger.app.info("备用模型「\(profile.name, privacy: .public)」转写成功")
+                    return result
+                }
+                attempts.append("\(displayName(profile))：返回空结果")
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                Logger.app.error("备用模型「\(profile.name, privacy: .public)」失败：\(String(describing: error), privacy: .public)")
+                attempts.append("\(displayName(profile))：\(error.localizedDescription)")
+            }
+        }
+
+        throw AllModelsFailedError(attempts: attempts)
+    }
+
+    /// 用已经写好的 WAV 重新走一个模型；火山流式按 150ms 分片补发。
+    private func transcribeRecordedFile(
+        _ wavURL: URL,
+        profile: EndpointProfile,
+        duration: TimeInterval
+    ) async throws -> TranscriptionResult {
+        guard let provider = providers[profile.kind] else {
+            throw TranscriptionError.unsupportedProvider(profile.kind)
+        }
+        let options = TranscriptionOptions(
+            sessionID: UUID(),
+            textMode: settings.settings.textMode,
+            audioDuration: duration,
+            lexicon: settings.settings.lexicon
+        )
+        let session = try await provider.makeSession(profile: profile, options: options)
+
+        if profile.kind == .volcengineStreaming {
+            let pcm = try AudioFileConverter.pcmFromWAV(wavURL)
+            var offset = 0
+            while offset < pcm.count {
+                try Task.checkCancellation()
+                let end = min(offset + 6_400, pcm.count)
+                try await session.appendAudio(pcm.subdata(in: offset..<end))
+                offset = end
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+        }
+        return try await session.finish(recordingURL: wavURL)
+    }
+
+    private func displayName(_ profile: EndpointProfile) -> String {
+        profile.name.isEmpty ? profile.kind.displayName : profile.name
     }
 
     /// 在后台执行可能阻塞的音频操作，并加超时保护，避免菜单栏状态永久卡住。
@@ -553,18 +676,33 @@ final class AppCoordinator: ObservableObject {
     private func handleStreamingFailure(_ error: Error, sessionID: UUID) async {
         guard currentSessionID == sessionID else { return }
         Logger.app.error("流式发送失败: \(String(describing: error), privacy: .public)")
-        audioCapture.cancel()
-        audioTask?.cancel()
-        audioTask = nil
-        pendingAudio.removeAll()
+
+        let remaining = sessionProfiles.filter { !attemptedProfileIDs.contains($0.id) }
         cleanupTranscriptionSession()
-        appState.present(error: AppError(message: error.localizedDescription))
-        transition(to: .failed)
+        pendingAudio.removeAll()
+
+        if remaining.isEmpty {
+            audioCapture.cancel()
+            audioTask?.cancel()
+            audioTask = nil
+            appState.present(error: AppError(message: error.localizedDescription))
+            transition(to: .failed)
+            return
+        }
+
+        // 保留录音：不中断采集，结束后用剩余模型重跑整段音频。
+        streamingFailed = true
+        appState.present(notice: "当前模型连接中断，结束后会自动切换备用模型。")
     }
 
     private func failStart(_ error: Error, sessionID: UUID) {
         guard currentSessionID == sessionID else { return }
         Logger.app.error("启动识别失败: \(String(describing: error), privacy: .public)")
+        audioCapture.cancel()
+        audioTask?.cancel()
+        audioTask = nil
+        pendingAudio.removeAll()
+        cleanupTranscriptionSession()
         appState.present(error: AppError(message: error.localizedDescription))
         transition(to: .failed)
     }
@@ -577,6 +715,7 @@ final class AppCoordinator: ObservableObject {
             transcriptionSession = nil
             Task { await session.cancel() }
         }
+        activeSessionProfile = nil
         capturedByteCount = 0
     }
 
@@ -641,5 +780,16 @@ final class AppCoordinator: ObservableObject {
             // 终态：清理 session，避免迟到结果再写入目标应用。
             finishSession()
         }
+    }
+}
+
+/// 所有识别模型都失败时，把每个模型的失败原因汇总给用户。
+struct AllModelsFailedError: LocalizedError {
+    var attempts: [String]
+
+    var errorDescription: String? {
+        guard !attempts.isEmpty else { return "所有识别模型均失败，请检查模型配置。" }
+        let detail = attempts.suffix(3).joined(separator: "；")
+        return "所有识别模型均失败。\(detail)"
     }
 }

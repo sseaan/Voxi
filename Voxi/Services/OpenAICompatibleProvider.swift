@@ -15,6 +15,7 @@ enum OpenAICompatibleRequestBuilder {
         fileURL: URL,
         fileData: Data,
         secretResolver: SecretResolving,
+        lexicon: PersonalLexicon = PersonalLexicon(),
         boundary: String = "VoxiBoundary-\(UUID().uuidString)"
     ) throws -> URLRequest {
         let validation = profile.validation()
@@ -32,9 +33,12 @@ enum OpenAICompatibleRequestBuilder {
         if profile.openAI.sendsLanguageField {
             form.addField(name: "language", value: textMode.language.iso639Code)
         }
-        let prompt = textMode.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        if profile.openAI.sendsPromptField, !prompt.isEmpty {
-            form.addField(name: "prompt", value: prompt)
+        let promptParts = [
+            textMode.prompt.trimmingCharacters(in: .whitespacesAndNewlines),
+            lexicon.promptHint ?? ""
+        ].filter { !$0.isEmpty }
+        if profile.openAI.sendsPromptField, !promptParts.isEmpty {
+            form.addField(name: "prompt", value: promptParts.joined(separator: "，"))
         }
         for field in profile.openAI.customFormFields
         where !field.name.isEmpty
@@ -201,7 +205,8 @@ final class OpenAICompatibleSession: TranscriptionSession {
             textMode: options.textMode,
             fileURL: recordingURL,
             fileData: fileData,
-            secretResolver: secretResolver
+            secretResolver: secretResolver,
+            lexicon: options.lexicon
         )
         if let override = options.requestTimeout {
             request.timeoutInterval = override

@@ -30,7 +30,6 @@ final class AudioFileTranscriptionModel: ObservableObject {
     private var wavURL: URL?
     private var workTask: Task<Void, Never>?
     private var session: (any TranscriptionSession)?
-    private var networkRetryUsed = false
 
     init(settings: SettingsStore, targetPID: pid_t?) {
         self.settings = settings
@@ -38,11 +37,15 @@ final class AudioFileTranscriptionModel: ObservableObject {
     }
 
     var providerName: String {
-        settings.activeProfile?.name ?? "未配置识别端点"
+        let profiles = settings.settings.profiles
+        guard let first = profiles.first else { return "未配置识别端点" }
+        return profiles.count > 1
+            ? "\(first.name) + \(profiles.count - 1) 个备用模型"
+            : first.name
     }
 
     var canStart: Bool {
-        sourceURL != nil && settings.activeProfile != nil && !phase.isBusy
+        sourceURL != nil && !settings.settings.profiles.isEmpty && !phase.isBusy
     }
 
     func updateTargetPID(_ pid: pid_t?) {
@@ -64,13 +67,13 @@ final class AudioFileTranscriptionModel: ObservableObject {
     }
 
     func start() {
-        guard let sourceURL, let profile = settings.activeProfile, !phase.isBusy else { return }
+        guard let sourceURL, !settings.settings.profiles.isEmpty, !phase.isBusy else { return }
         cleanTempFile()
         let wavURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Voxi-upload-\(UUID().uuidString).wav")
         self.wavURL = wavURL
         phase = .converting(0)
-        networkRetryUsed = false
+        notice = nil
 
         workTask = Task { [weak self] in
             guard let self else { return }
@@ -87,15 +90,7 @@ final class AudioFileTranscriptionModel: ObservableObject {
                     }
                 }.value
                 try Task.checkCancellation()
-                do {
-                    try await self.transcribe(result: result, profile: profile)
-                } catch let error as TranscriptionError where error.isTransientNetwork && !self.networkRetryUsed {
-                    // 瞬时网络错误自动重试一次（文件已转换好，无需重新转换）。
-                    self.networkRetryUsed = true
-                    self.notice = "网络中断，正在自动重试一次…"
-                    try? await Task.sleep(nanoseconds: 1_200_000_000)
-                    try await self.transcribe(result: result, profile: profile)
-                }
+                try await self.transcribeWithFallback(result: result)
             } catch is CancellationError {
                 self.phase = .idle
             } catch {
@@ -176,20 +171,49 @@ final class AudioFileTranscriptionModel: ObservableObject {
     /// 火山流式单次连接适合 ≤60 秒音频，长文件自动分段，逐段转写后拼接。
     private static let volcengineSegmentBytes = 1_600_000  // 50 秒 @ 16 kHz / mono / PCM16
 
-    private func transcribe(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
+    private func transcribeWithFallback(result: AudioFileConverter.Result) async throws {
+        var attempts: [String] = []
+        let profiles = settings.settings.profiles
+        for (index, profile) in profiles.enumerated() {
+            try Task.checkCancellation()
+            do {
+                let text = try await transcribe(result: result, profile: profile)
+                let finalText = settings.settings.textMode.finalize(
+                    settings.settings.lexicon.replacing(in: text)
+                )
+                phase = .done(finalText)
+                interimText = ""
+                notice = nil
+                return
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                if Task.isCancelled { throw CancellationError() }
+                let name = profile.name.isEmpty ? profile.kind.displayName : profile.name
+                attempts.append("\(name)：\(error.localizedDescription)")
+                interimText = ""
+                if index < profiles.count - 1 {
+                    notice = "「\(name)」失败，正在尝试备用模型…"
+                }
+            }
+        }
+        throw AllModelsFailedError(attempts: attempts)
+    }
+
+    private func transcribe(result: AudioFileConverter.Result, profile: EndpointProfile) async throws -> String {
         let validation = profile.validation()
         guard validation.isValid else {
             throw TranscriptionError.invalidConfiguration(validation.message ?? "端点配置无效。")
         }
 
         if profile.kind == .volcengineStreaming {
-            try await transcribeWithVolcengine(result: result, profile: profile)
+            return try await transcribeWithVolcengine(result: result, profile: profile)
         } else {
-            try await transcribeWithOpenAI(result: result, profile: profile)
+            return try await transcribeWithOpenAI(result: result, profile: profile)
         }
     }
 
-    private func transcribeWithOpenAI(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
+    private func transcribeWithOpenAI(result: AudioFileConverter.Result, profile: EndpointProfile) async throws -> String {
         let provider = OpenAICompatibleProvider()
         // 长音频的服务端处理时间可能超过端点默认超时，按音频时长放宽。
         let timeout = max(profile.openAI.timeoutSeconds, result.duration * 1.2 + 60)
@@ -197,7 +221,8 @@ final class AudioFileTranscriptionModel: ObservableObject {
             sessionID: UUID(),
             textMode: settings.settings.textMode,
             audioDuration: result.duration,
-            requestTimeout: timeout
+            requestTimeout: timeout,
+            lexicon: settings.settings.lexicon
         )
         let session = try await provider.makeSession(profile: profile, options: options)
         self.session = session
@@ -206,16 +231,14 @@ final class AudioFileTranscriptionModel: ObservableObject {
         do {
             let transcription = try await session.finish(recordingURL: result.url)
             self.session = nil
-            let finalText = settings.settings.textMode.finalize(transcription.text)
-            phase = .done(finalText)
-            interimText = ""
+            return transcription.text
         } catch {
             self.session = nil
             throw error
         }
     }
 
-    private func transcribeWithVolcengine(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
+    private func transcribeWithVolcengine(result: AudioFileConverter.Result, profile: EndpointProfile) async throws -> String {
         let provider = VolcengineStreamingProvider()
         let pcm = try AudioFileConverter.pcmFromWAV(result.url)
         let totalBytes = max(pcm.count, 1)
@@ -229,7 +252,8 @@ final class AudioFileTranscriptionModel: ObservableObject {
             let options = TranscriptionOptions(
                 sessionID: UUID(),
                 textMode: settings.settings.textMode,
-                audioDuration: Double(segment.count) / 32_000
+                audioDuration: Double(segment.count) / 32_000,
+                lexicon: settings.settings.lexicon
             )
             let session = try await provider.makeSession(profile: profile, options: options)
             self.session = session
@@ -273,9 +297,7 @@ final class AudioFileTranscriptionModel: ObservableObject {
             }
         }
 
-        let finalText = settings.settings.textMode.finalize(Self.joinTranscripts(pieces))
-        phase = .done(finalText)
-        interimText = ""
+        return Self.joinTranscripts(pieces)
     }
 
     /// 段间拼接：两侧都是 ASCII 字符时补一个空格，中文直接相连。

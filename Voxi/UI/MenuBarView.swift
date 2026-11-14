@@ -79,7 +79,10 @@ struct MenuBarView: View {
                     .foregroundStyle(.secondary)
             }
         } else if let profile = settings.activeProfile {
-            Text("\(profile.name) · \(profile.kind == .openAICompatible ? "停止后上传" : "实时流式")")
+            let count = settings.settings.profiles.count
+            Text(count > 1
+                 ? "\(profile.name) · 自动回退 \(count) 个模型"
+                 : "\(profile.name) · \(profile.kind == .openAICompatible ? "停止后上传" : "实时流式")")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

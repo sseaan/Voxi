@@ -419,4 +419,22 @@ final class OpenAICompatibleProviderTests: XCTestCase {
         XCTAssertTrue(redacted.contains("example.com"))
         XCTAssertEqual(Logger.redactedValue("sk-123456"), "<9 chars>")
     }
+
+    func testLexiconTermsAreAppendedToPrompt() throws {
+        let lexicon = PersonalLexicon(entries: [
+            LexiconEntry(term: "Voxi"),
+            LexiconEntry(term: "Sean")
+        ])
+        let request = try OpenAICompatibleRequestBuilder.makeRequest(
+            profile: makeProfile(),
+            secret: "sk-test",
+            textMode: TextMode(prompt: "测试提示"),
+            fileURL: tempFileURL,
+            fileData: Data("FAKEWAVDATA".utf8),
+            secretResolver: InMemorySecretResolver([:]),
+            lexicon: lexicon
+        )
+        let body = String(decoding: StubURLProtocol.body(of: request), as: UTF8.self)
+        XCTAssertTrue(body.contains("name=\"prompt\"\r\n\r\n测试提示，Voxi、Sean"))
+    }
 }

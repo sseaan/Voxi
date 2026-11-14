@@ -106,7 +106,8 @@ final class SettingsStoreTests: XCTestCase {
         )
         store.addProfile(added)
         XCTAssertEqual(store.settings.profiles.count, 2)
-        XCTAssertEqual(store.activeProfile?.id, added.id)
+        XCTAssertEqual(store.activeProfile?.id, original.id, "首选模型始终是回退链第一个")
+        XCTAssertEqual(store.settings.profiles.last?.id, added.id)
 
         store.removeProfile(id: added.id)
         XCTAssertEqual(store.settings.profiles.count, 1)
