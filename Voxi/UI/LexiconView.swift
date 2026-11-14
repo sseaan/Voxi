@@ -60,11 +60,13 @@ struct LexiconView: View {
                         .frame(width: 250)
                 }
                 SettingsDivider()
-                SettingsFieldRow("常见误写", subtitle: "逗号或顿号分隔，可留空") {
+                SettingsFieldRow("常见误写", subtitle: "逗号分隔，可留空") {
                     HStack(spacing: 8) {
                         lexiconField("voxy, boxy", text: $newAliases)
-                            .frame(width: 190)
+                            .frame(minWidth: 110, maxWidth: 160)
                         Button("添加", action: addEntry)
+                            .controlSize(.small)
+                            .fixedSize()
                             .disabled(newTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
