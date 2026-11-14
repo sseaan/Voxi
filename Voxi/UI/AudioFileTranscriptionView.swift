@@ -156,69 +156,123 @@ final class AudioFileTranscriptionModel: ObservableObject {
 
     // MARK: - 识别
 
+    /// 火山流式单次连接适合 ≤60 秒音频，长文件自动分段，逐段转写后拼接。
+    private static let volcengineSegmentBytes = 1_600_000  // 50 秒 @ 16 kHz / mono / PCM16
+
     private func transcribe(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
         let validation = profile.validation()
         guard validation.isValid else {
             throw TranscriptionError.invalidConfiguration(validation.message ?? "端点配置无效。")
         }
 
-        let provider: TranscriptionProvider
-        switch profile.kind {
-        case .openAICompatible:
-            provider = OpenAICompatibleProvider()
-        case .volcengineStreaming:
-            provider = VolcengineStreamingProvider()
+        if profile.kind == .volcengineStreaming {
+            try await transcribeWithVolcengine(result: result, profile: profile)
+        } else {
+            try await transcribeWithOpenAI(result: result, profile: profile)
         }
+    }
 
+    private func transcribeWithOpenAI(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
+        let provider = OpenAICompatibleProvider()
+        // 长音频的服务端处理时间可能超过端点默认超时，按音频时长放宽。
+        let timeout = max(profile.openAI.timeoutSeconds, result.duration * 1.2 + 60)
         let options = TranscriptionOptions(
             sessionID: UUID(),
             textMode: settings.settings.textMode,
-            audioDuration: result.duration
+            audioDuration: result.duration,
+            requestTimeout: timeout
         )
         let session = try await provider.makeSession(profile: profile, options: options)
         self.session = session
-        phase = .transcribing(profile.kind == .volcengineStreaming ? 0 : -1)
-
-        let updatesTask = Task { [weak self] in
-            guard let self else { return }
-            do {
-                for try await update in session.updates {
-                    if case .interim(let text) = update {
-                        self.interimText = text
-                    }
-                }
-            } catch {
-                // 最终错误由 finish 抛出。
-            }
-        }
-
-        let text: String
-        if profile.kind == .volcengineStreaming {
-            let pcm = try AudioFileConverter.pcmFromWAV(result.url)
-            var offset = 0
-            while offset < pcm.count {
-                try Task.checkCancellation()
-                let end = min(offset + 6_400, pcm.count)
-                try await session.appendAudio(pcm.subdata(in: offset..<end))
-                offset = end
-                phase = .transcribing(Double(offset) / Double(pcm.count))
-                // 文件转写按 150ms/分片发送，略快于实时，避免长文件等待过久。
-                try? await Task.sleep(nanoseconds: 150_000_000)
-            }
-        }
+        phase = .transcribing(-1)
 
         do {
             let transcription = try await session.finish(recordingURL: result.url)
-            updatesTask.cancel()
             self.session = nil
             let finalText = settings.settings.textMode.finalize(transcription.text)
             phase = .done(finalText)
             interimText = ""
         } catch {
-            updatesTask.cancel()
             self.session = nil
             throw error
         }
+    }
+
+    private func transcribeWithVolcengine(result: AudioFileConverter.Result, profile: EndpointProfile) async throws {
+        let provider = VolcengineStreamingProvider()
+        let pcm = try AudioFileConverter.pcmFromWAV(result.url)
+        let totalBytes = max(pcm.count, 1)
+        var offset = 0
+        var pieces: [String] = []
+
+        while offset < pcm.count {
+            try Task.checkCancellation()
+            let end = min(offset + Self.volcengineSegmentBytes, pcm.count)
+            let segment = pcm.subdata(in: offset..<end)
+            let options = TranscriptionOptions(
+                sessionID: UUID(),
+                textMode: settings.settings.textMode,
+                audioDuration: Double(segment.count) / 32_000
+            )
+            let session = try await provider.makeSession(profile: profile, options: options)
+            self.session = session
+
+            let prefix = Self.joinTranscripts(pieces)
+            let updatesTask = Task { [weak self] in
+                guard let self else { return }
+                do {
+                    for try await update in session.updates {
+                        if case .interim(let text) = update {
+                            self.interimText = Self.joinTranscripts([prefix, text])
+                        }
+                    }
+                } catch {
+                    // 最终错误由 finish 抛出。
+                }
+            }
+
+            var segmentOffset = 0
+            while segmentOffset < segment.count {
+                try Task.checkCancellation()
+                let chunkEnd = min(segmentOffset + 6_400, segment.count)
+                try await session.appendAudio(segment.subdata(in: segmentOffset..<chunkEnd))
+                segmentOffset = chunkEnd
+                phase = .transcribing(Double(offset + segmentOffset) / Double(totalBytes))
+                // 略快于实时发送，长文件才不至于等太久。
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+
+            do {
+                let transcription = try await session.finish(recordingURL: result.url)
+                updatesTask.cancel()
+                self.session = nil
+                let piece = transcription.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !piece.isEmpty { pieces.append(piece) }
+                offset = end
+            } catch {
+                updatesTask.cancel()
+                self.session = nil
+                throw error
+            }
+        }
+
+        let finalText = settings.settings.textMode.finalize(Self.joinTranscripts(pieces))
+        phase = .done(finalText)
+        interimText = ""
+    }
+
+    /// 段间拼接：两侧都是 ASCII 字符时补一个空格，中文直接相连。
+    nonisolated static func joinTranscripts(_ parts: [String]) -> String {
+        var result = ""
+        for part in parts where !part.isEmpty {
+            if let last = result.last, let first = part.first,
+               last.isASCII, first.isASCII,
+               !last.isWhitespace, !first.isWhitespace {
+                result += " "
+            }
+            result += part
+        }
+        return result
     }
 
     private func cleanTempFile() {

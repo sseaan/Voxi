@@ -124,6 +124,18 @@ final class VolcengineStreamingProviderTests: XCTestCase {
 
     // MARK: - 鉴权 headers
 
+    func testReadySessionIsNotClosedByInitializationTimeout() async throws {
+        let transport = FakeVolcengineTransport()
+        transport.enqueue(ackFrame())
+        let provider = makeProvider(transport: transport, secrets: [keyID: "api-key-value"], initTimeout: 0.2)
+        _ = try await makeSession(provider, profile: makeProfile())
+        XCTAssertFalse(transport.isClosed)
+
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertFalse(transport.isClosed, "初始化超时不应关闭已经就绪的长连接")
+        XCTAssertTrue(transport.isClosed == false)
+    }
+
     func testApiKeyHeaders() async throws {
         let transport = FakeVolcengineTransport()
         transport.enqueue(ackFrame())

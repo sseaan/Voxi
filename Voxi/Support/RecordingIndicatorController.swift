@@ -73,47 +73,48 @@ final class RecordingIndicatorModel: ObservableObject {
 
 struct RecordingIndicatorView: View {
     @ObservedObject var model: RecordingIndicatorModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        WaveformBars(levels: model.levels)
+        WaveformBars(levels: model.levels, isDark: colorScheme == .dark)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .frame(width: 200, height: 44)
-            .background(IndicatorGlassBackground())
-            .clipShape(Capsule())
+            .background(
+                Capsule()
+                    .fill(colorScheme == .dark
+                          ? Color.black.opacity(0.78)
+                          : Color.white.opacity(0.94))
+            )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.18), lineWidth: 0.8)
+                    .stroke(colorScheme == .dark
+                            ? Color.white.opacity(0.14)
+                            : Color.black.opacity(0.08),
+                            lineWidth: 0.8)
             )
     }
 }
 
-/// 毛玻璃背景（macOS 26+ 自动获得的玻璃观感，旧系统为 HUD 材质）。
-struct IndicatorGlassBackground: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        let view = NSVisualEffectView()
-        view.material = .hudWindow
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.wantsLayer = true
-        view.layer?.cornerRadius = 22
-        view.layer?.cornerCurve = .continuous
-        view.layer?.masksToBounds = true
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
 struct WaveformBars: View {
     let levels: [Float]
+    var isDark: Bool
     var barCount = 26
 
-    private let gradient = LinearGradient(
-        colors: [Color.white.opacity(0.95), Color(red: 0.55, green: 0.8, blue: 1.0)],
-        startPoint: .top,
-        endPoint: .bottom
-    )
+    private var gradient: LinearGradient {
+        if isDark {
+            return LinearGradient(
+                colors: [Color.white.opacity(0.96), Color(red: 0.55, green: 0.8, blue: 1.0)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        return LinearGradient(
+            colors: [Color(white: 0.18), Color(red: 0.12, green: 0.36, blue: 0.86)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 3) {

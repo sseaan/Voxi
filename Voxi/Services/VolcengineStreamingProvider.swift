@@ -234,9 +234,10 @@ final class VolcengineStreamingSession: TranscriptionSession {
                 }
                 Task.detached {
                     try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                    once.resume(.failure(TranscriptionError.timeout))
-                    // 超时后主动断开，帮助挂起的 send/receive 退出。
-                    transport.close()
+                    // 只有超时真正赢得竞速时才断开；否则会把已建立的会话掐断。
+                    if once.resume(.failure(TranscriptionError.timeout)) {
+                        transport.close()
+                    }
                 }
             }
         } catch {
@@ -530,15 +531,18 @@ final class VolcengineStreamingSession: TranscriptionSession {
             self.continuation = continuation
         }
 
-        func resume(_ result: Result<Void, Error>) {
+        /// 返回 true 表示本次调用赢得了竞速。
+        @discardableResult
+        func resume(_ result: Result<Void, Error>) -> Bool {
             lock.lock()
             guard !didResume else {
                 lock.unlock()
-                return
+                return false
             }
             didResume = true
             lock.unlock()
             continuation.resume(with: result)
+            return true
         }
     }
 

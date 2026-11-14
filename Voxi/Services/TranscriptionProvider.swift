@@ -10,6 +10,8 @@ struct TranscriptionOptions {
     var sessionID: UUID
     var textMode: TextMode
     var audioDuration: TimeInterval?
+    /// 文件转写等长任务可覆盖端点默认超时。
+    var requestTimeout: TimeInterval? = nil
 }
 
 /// ASR provider 统一边界。两种协议的网络交互不同，但都通过这个接口对协调器暴露。

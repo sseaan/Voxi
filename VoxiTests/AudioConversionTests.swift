@@ -260,3 +260,19 @@ final class PCMChunkerTests: XCTestCase {
         XCTAssertEqual(chunker.pendingByteCount, 100)
     }
 }
+
+final class TranscriptJoiningTests: XCTestCase {
+    func testChineseSegmentsJoinWithoutSpace() {
+        XCTAssertEqual(AudioFileTranscriptionModel.joinTranscripts(["你好", "世界"]), "你好世界")
+    }
+
+    func testEnglishSegmentsJoinWithSpace() {
+        XCTAssertEqual(AudioFileTranscriptionModel.joinTranscripts(["Hello,", "world"]), "Hello, world")
+        XCTAssertEqual(AudioFileTranscriptionModel.joinTranscripts(["foo", "bar"]), "foo bar")
+    }
+
+    func testEmptySegmentsAreSkipped() {
+        XCTAssertEqual(AudioFileTranscriptionModel.joinTranscripts(["", "你好", ""]), "你好")
+        XCTAssertEqual(AudioFileTranscriptionModel.joinTranscripts([]), "")
+    }
+}

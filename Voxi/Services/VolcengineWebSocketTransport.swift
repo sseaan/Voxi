@@ -34,7 +34,7 @@ final class URLSessionWebSocketTransport: VolcengineWebSocketTransport {
     }
 
     func send(_ data: Data) async throws {
-        guard let task else { throw URLError(.notConnectedToInternet) }
+        guard let task else { throw TranscriptionError.network("WebSocket 连接已关闭，请重试。") }
         try await task.send(.data(data))
     }
 

@@ -195,7 +195,7 @@ final class OpenAICompatibleSession: TranscriptionSession {
         } else {
             secret = nil
         }
-        let request = try OpenAICompatibleRequestBuilder.makeRequest(
+        var request = try OpenAICompatibleRequestBuilder.makeRequest(
             profile: profile,
             secret: secret,
             textMode: options.textMode,
@@ -203,6 +203,9 @@ final class OpenAICompatibleSession: TranscriptionSession {
             fileData: fileData,
             secretResolver: secretResolver
         )
+        if let override = options.requestTimeout {
+            request.timeoutInterval = override
+        }
 
         Logger.http.info("上传转写请求 url=\(Logger.redactedURL(self.profile.endpointURL), privacy: .public) bytes=\(fileData.count, privacy: .public)")
 
