@@ -7,6 +7,8 @@ struct EndpointListView: View {
     @State private var editing: EditingProfile?
     @State private var pendingDelete: EndpointProfile?
     @State private var testingProfile: EndpointProfile?
+    @State private var editingLanguageModel: LanguageModelProfile?
+    @State private var pendingDeleteLanguageModel = false
 
     private struct EditingProfile: Identifiable {
         var profile: EndpointProfile
@@ -20,13 +22,17 @@ struct EndpointListView: View {
         SettingsPage(title: "模型") {
             SettingsListCard(
                 "模型来源",
-                footer: "API Key 只保存在 macOS 钥匙串中；云端请求直接发往你填写的端点。"
+                footer: "标签区分语音识别与语言模型；API Key 只保存在 macOS 钥匙串中。"
             ) {
                 ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
                     if index > 0 {
                         Divider().padding(.leading, 12).opacity(0.6)
                     }
                     sourceRow(profile, index: index)
+                }
+                if let model = settings.settings.languageModel {
+                    Divider().padding(.leading, 12).opacity(0.6)
+                    languageModelRow(model)
                 }
                 Divider().padding(.leading, 12).opacity(0.6)
                 Button {
@@ -65,15 +71,21 @@ struct EndpointListView: View {
             }
         }
         .sheet(isPresented: $addingSource) {
-            ProviderPickerSheet { kind in
-                var profile = kind == .openAICompatible
-                    ? EndpointProfile.defaultOpenAIProfile()
-                    : EndpointProfile.defaultVolcengineProfile()
-                profile.name = kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包"
+            ProviderPickerSheet { choice in
                 // 等来源选择弹窗完全收起后再打开编辑弹窗，避免两个 sheet 竞争。
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 350_000_000)
-                    editing = EditingProfile(profile: profile, isNew: true)
+                    switch choice {
+                    case .asr(let kind):
+                        var profile = kind == .openAICompatible
+                            ? EndpointProfile.defaultOpenAIProfile()
+                            : EndpointProfile.defaultVolcengineProfile()
+                        profile.name = kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包"
+                        editing = EditingProfile(profile: profile, isNew: true)
+                    case .languageModel:
+                        editingLanguageModel = settings.settings.languageModel
+                            ?? LanguageModelProfile()
+                    }
                 }
             }
         }
@@ -91,6 +103,28 @@ struct EndpointListView: View {
         }
         .sheet(item: $testingProfile) { profile in
             EndpointTestView(profile: profile)
+        }
+        .sheet(item: $editingLanguageModel) { profile in
+            LanguageModelEditorSheet(
+                profile: profile,
+                onSave: { saved in
+                    settings.settings.languageModel = saved
+                    editingLanguageModel = nil
+                },
+                onCancel: { editingLanguageModel = nil }
+            )
+        }
+        .confirmationDialog(
+            "删除语言模型配置？",
+            isPresented: $pendingDeleteLanguageModel
+        ) {
+            Button("删除", role: .destructive) {
+                deleteLanguageModel()
+                pendingDeleteLanguageModel = false
+            }
+            Button("取消", role: .cancel) { pendingDeleteLanguageModel = false }
+        } message: {
+            Text("风格整理将停止工作，直到重新配置语言模型。")
         }
         .confirmationDialog(
             "删除这个模型来源？",
@@ -119,15 +153,7 @@ struct EndpointListView: View {
                     Text(profile.name.isEmpty ? "未命名来源" : profile.name)
                         .font(.system(size: 13))
                         .lineLimit(1)
-                    Text(index == 0 ? "首选" : "备用 \(index)")
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(index == 0 ? Color.green : Color.secondary)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(
-                            (index == 0 ? Color.green : Color.secondary).opacity(0.12),
-                            in: Capsule()
-                        )
+                    CapabilityTag(text: "语音识别", color: Color(red: 0.33, green: 0.47, blue: 0.92))
                 }
                 Text(sourceSummary(profile))
                     .font(.system(size: 11))
@@ -243,6 +269,51 @@ struct EndpointListView: View {
         settings.settings.activeProfileID = settings.settings.profiles.first?.id
     }
 
+    private func languageModelRow(_ model: LanguageModelProfile) -> some View {
+        HStack(spacing: 10) {
+            LanguageModelBadge()
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(model.name.isEmpty ? "通用 OpenAI" : model.name)
+                        .font(.system(size: 13))
+                        .lineLimit(1)
+                    CapabilityTag(text: "语言模型", color: Color(red: 0.20, green: 0.68, blue: 0.48))
+                }
+                Text("通用 OpenAI · \(model.model)")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 12)
+            Text(model.authMode == .none
+                 ? "无需密钥"
+                 : (model.apiKeyItemID == nil ? "未设置" : "••••••••"))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Button("修改") {
+                editingLanguageModel = model
+            }
+            .controlSize(.small)
+            Button {
+                pendingDeleteLanguageModel = true
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.tertiary)
+            }
+            .buttonStyle(.plain)
+            .help("删除语言模型")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+
+    private func deleteLanguageModel() {
+        if let id = settings.settings.languageModel?.apiKeyItemID {
+            try? KeychainService.shared.delete(id)
+        }
+        settings.settings.languageModel = nil
+    }
+
     private func modelName(_ profile: EndpointProfile) -> String {
         switch profile.kind {
         case .openAICompatible:
@@ -301,22 +372,69 @@ private struct ProviderBadge: View {
     }
 }
 
-private struct ProviderPickerSheet: View {
-    let onPick: (EndpointProfile.ProviderKind) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var selected: EndpointProfile.ProviderKind = .openAICompatible
+private enum ProviderChoice: Equatable {
+    case asr(EndpointProfile.ProviderKind)
+    case languageModel
+}
+
+private struct CapabilityTag: View {
+    let text: String
+    let color: Color
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        Text(text)
+            .font(.system(size: 9.5, weight: .medium))
+            .foregroundStyle(color)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct LanguageModelBadge: View {
+    var size: CGFloat = 26
+
+    var body: some View {
+        Image(systemName: "brain")
+            .font(.system(size: size * 0.42, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: size, height: size)
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 0.22, green: 0.74, blue: 0.54), Color(red: 0.10, green: 0.55, blue: 0.42)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                ),
+                in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+            )
+    }
+}
+
+private struct ProviderPickerSheet: View {
+    let onPick: (ProviderChoice) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: ProviderChoice = .asr(.openAICompatible)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text("添加模型来源")
                 .font(.system(size: 18, weight: .semibold))
 
+            Text("语音识别")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
             HStack(spacing: 10) {
-                providerCard(.openAICompatible)
-                providerCard(.volcengineStreaming)
+                asrCard(.openAICompatible)
+                asrCard(.volcengineStreaming)
             }
 
-            Text(selected.summary)
+            Text("语言模型")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+            languageModelCard
+
+            Text(detail)
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -333,13 +451,22 @@ private struct ProviderPickerSheet: View {
             }
         }
         .padding(22)
-        .frame(width: 520)
+        .frame(width: 560)
     }
 
-    private func providerCard(_ kind: EndpointProfile.ProviderKind) -> some View {
-        let isSelected = selected == kind
+    private var detail: String {
+        switch selected {
+        case .asr(let kind):
+            return kind.summary
+        case .languageModel:
+            return "配置 OpenAI-compatible Chat Completions，用于在识别完成后按所选风格整理文本。与语音识别来源分开保存。"
+        }
+    }
+
+    private func asrCard(_ kind: EndpointProfile.ProviderKind) -> some View {
+        let isSelected = selected == .asr(kind)
         return Button {
-            selected = kind
+            selected = .asr(kind)
         } label: {
             HStack(spacing: 10) {
                 ProviderBadge(kind: kind, size: 28)
@@ -371,6 +498,202 @@ private struct ProviderPickerSheet: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var languageModelCard: some View {
+        let isSelected = selected == .languageModel
+        return Button {
+            selected = .languageModel
+        } label: {
+            HStack(spacing: 10) {
+                LanguageModelBadge(size: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("通用 OpenAI 接入")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary)
+                    Text("Chat Completions · 用于风格整理")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.45))
+            }
+            .padding(.horizontal, 13)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct LanguageModelEditorSheet: View {
+    @State private var draft: LanguageModelProfile
+    @State private var apiKeyInput = ""
+    @State private var message: String?
+    private let onSave: (LanguageModelProfile) -> Void
+    private let onCancel: () -> Void
+    private let keychain = KeychainService.shared
+
+    init(
+        profile: LanguageModelProfile,
+        onSave: @escaping (LanguageModelProfile) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        _draft = State(initialValue: profile)
+        self.onSave = onSave
+        self.onCancel = onCancel
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(draft.apiKeyItemID == nil ? "添加通用 OpenAI 接入" : "编辑通用 OpenAI 接入")
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Button("取消") { onCancel() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    SettingsListCard(
+                        "连接",
+                        footer: "Endpoint 可填完整的 /chat/completions，也可只填到 /v1，Voxi 会自动补全。"
+                    ) {
+                        SettingsFieldRow("名称") {
+                            TextField("通用 OpenAI", text: $draft.name)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 240)
+                        }
+                        SettingsDivider()
+                        SettingsFieldRow("Endpoint") {
+                            TextField(
+                                "https://api.openai.com/v1/chat/completions",
+                                text: $draft.endpointURL
+                            )
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
+                        }
+                        SettingsDivider()
+                        SettingsFieldRow("model") {
+                            TextField("gpt-4o-mini", text: $draft.model)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 200)
+                        }
+                    }
+
+                    SettingsListCard("鉴权与参数") {
+                        SettingsFieldRow("鉴权") {
+                            Picker("", selection: $draft.authMode) {
+                                ForEach(LanguageModelProfile.AuthMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                        if draft.authMode == .bearer {
+                            SettingsDivider()
+                            SettingsFieldRow(
+                                "API Key",
+                                subtitle: "保存到 Keychain；更新后首次读取可能需要选择“始终允许”。"
+                            ) {
+                                HStack(spacing: 6) {
+                                    SecureField(
+                                        draft.apiKeyItemID == nil
+                                            ? "填写 API Key"
+                                            : "已保存（留空不修改）",
+                                        text: $apiKeyInput
+                                    )
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 260)
+                                    if draft.apiKeyItemID != nil {
+                                        Image(systemName: "lock.fill")
+                                            .foregroundStyle(.secondary)
+                                            .help("已保存在 Keychain")
+                                    }
+                                }
+                            }
+                        }
+                        SettingsDivider()
+                        SettingsFieldRow("超时") {
+                            HStack(spacing: 6) {
+                                TextField("60", value: $draft.timeoutSeconds, format: .number)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 70)
+                                Text("秒")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        SettingsDivider()
+                        SettingsFieldRow("temperature", subtitle: "0–2，越低越稳定") {
+                            TextField("0.3", value: $draft.temperature, format: .number)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 70)
+                        }
+                    }
+
+                    Text("语言模型只接收识别后的文本，不接收录音；提示词由当前风格决定。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.tertiary)
+                        .padding(.horizontal, 10)
+                }
+                .padding(18)
+            }
+
+            Divider()
+            HStack {
+                if let message {
+                    Text(message)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Button("保存") { save() }
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut("s", modifiers: .command)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+        }
+        .frame(width: 640, height: 560)
+    }
+
+    private func save() {
+        message = nil
+        var profile = draft
+        do {
+            if !apiKeyInput.isEmpty {
+                profile.apiKeyItemID = try keychain.store(
+                    apiKeyInput,
+                    for: profile.apiKeyItemID ?? UUID()
+                )
+            }
+            if let validation = profile.validation() {
+                message = validation
+                return
+            }
+            onSave(profile)
+        } catch {
+            message = error.localizedDescription
+        }
     }
 }
 

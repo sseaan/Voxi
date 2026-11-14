@@ -14,7 +14,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "通用"
         case .endpoints: return "模型"
-        case .text: return "文本"
+        case .text: return "风格"
         case .lexicon: return "词库"
         case .about: return "关于"
         }
@@ -24,7 +24,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape.fill"
         case .endpoints: return "square.stack.3d.up.fill"
-        case .text: return "textformat"
+        case .text: return "wand.and.stars"
         case .lexicon: return "character.book.closed.fill"
         case .about: return "info.circle.fill"
         }
@@ -34,7 +34,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return Color(red: 0.42, green: 0.48, blue: 0.56)
         case .endpoints: return Color(red: 0.33, green: 0.47, blue: 0.92)
-        case .text: return Color(red: 0.56, green: 0.45, blue: 0.86)
+        case .text: return Color(red: 0.64, green: 0.42, blue: 0.94)
         case .lexicon: return Color(red: 0.95, green: 0.61, blue: 0.19)
         case .about: return Color(red: 0.52, green: 0.56, blue: 0.62)
         }

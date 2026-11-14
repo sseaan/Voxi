@@ -21,6 +21,7 @@ final class AppCoordinator: ObservableObject {
     private let providers: [EndpointProfile.ProviderKind: TranscriptionProvider]
     private let textInserter: TextInserting
     private let frontmostProvider: FrontmostAppProviding
+    private let styleProcessor: (String, VoxiSettings) async throws -> String
     private let shortcutService = ShortcutService()
 
     private var permissionTask: Task<Void, Never>?
@@ -57,7 +58,10 @@ final class AppCoordinator: ObservableObject {
         audioCapture: AudioCapturing = AudioCaptureService(),
         providers: [TranscriptionProvider]? = nil,
         textInserter: TextInserting? = nil,
-        frontmostProvider: FrontmostAppProviding = SystemFrontmostApp()
+        frontmostProvider: FrontmostAppProviding = SystemFrontmostApp(),
+        styleProcessor: @escaping (String, VoxiSettings) async throws -> String = { text, settings in
+            try await StyleProcessor.process(text: text, settings: settings)
+        }
     ) {
         self.settings = settings
         self.appState = appState
@@ -69,6 +73,7 @@ final class AppCoordinator: ObservableObject {
         self.providers = Dictionary(uniqueKeysWithValues: resolvedProviders.map { ($0.kind, $0) })
         self.textInserter = textInserter ?? TextInsertionService(frontmost: frontmostProvider)
         self.frontmostProvider = frontmostProvider
+        self.styleProcessor = styleProcessor
     }
 
     /// 应用启动时调用一次：注册全局快捷键并跟随设置变化。
@@ -510,9 +515,21 @@ final class AppCoordinator: ObservableObject {
             updatesTask = nil
             appState.setInterimText("")
 
-            let finalText = settings.settings.textMode.finalize(
-                settings.settings.lexicon.replacing(in: result.text)
-            )
+            let rawText = settings.settings.lexicon.replacing(in: result.text)
+            var finalText = settings.settings.textMode.finalize(rawText)
+            var styleNotice: String?
+            let style = settings.settings.activeStyle
+            if style.requiresLLM {
+                do {
+                    let styled = try await styleProcessor(rawText, settings.settings)
+                    finalText = settings.settings.textMode.finalize(styled)
+                    try Task.checkCancellation()
+                } catch {
+                    if Task.isCancelled { return }
+                    Logger.app.error("风格处理失败: \(String(describing: error), privacy: .public)")
+                    styleNotice = "风格处理失败，已使用原文：\(error.localizedDescription)"
+                }
+            }
             var storedResult = result
             storedResult.text = finalText
             appState.setLastResult(storedResult)
@@ -532,7 +549,11 @@ final class AppCoordinator: ObservableObject {
                 }
                 switch outcome {
                 case .inserted:
-                    appState.present(notice: "已输入到前台应用。")
+                    if let styleNotice {
+                        appState.present(notice: "已输入到前台应用。\(styleNotice)")
+                    } else {
+                        appState.present(notice: "已输入到前台应用。")
+                    }
                     transition(to: .idle)
                 case .requiresManualCopy(let reason):
                     appState.present(error: AppError(
@@ -542,7 +563,7 @@ final class AppCoordinator: ObservableObject {
                     transition(to: .failed)
                 }
             } else {
-                appState.present(notice: "识别完成，可在下方复制结果。")
+                appState.present(notice: styleNotice ?? "识别完成，可在下方复制结果。")
                 transition(to: .idle)
             }
         } catch {

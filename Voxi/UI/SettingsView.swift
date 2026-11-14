@@ -78,7 +78,7 @@ struct SettingsView: View {
         case .endpoints:
             EndpointListView(settings: settings)
         case .text:
-            TextModeEditorView(settings: settings)
+            TextModeEditorView(settings: settings, onOpenModels: { tab = .endpoints })
         case .lexicon:
             LexiconView(settings: settings)
         case .about:

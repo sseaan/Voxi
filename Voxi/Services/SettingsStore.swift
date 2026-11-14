@@ -12,6 +12,11 @@ struct VoxiSettings: Codable, Equatable {
     var autoInsertEnabled: Bool
     var showInterimTextInMenuBar: Bool
     var lexicon: PersonalLexicon
+    /// 转写后的整理风格；nil 表示原文。
+    var selectedStyleID: UUID?
+    var customStyles: [TranscriptionStyle]
+    /// 通用 OpenAI Chat 配置；未配置时风格不生效。
+    var languageModel: LanguageModelProfile?
 
     static let currentSchemaVersion = 1
 
@@ -24,7 +29,10 @@ struct VoxiSettings: Codable, Equatable {
         textMode: TextMode = TextMode(),
         autoInsertEnabled: Bool = true,
         showInterimTextInMenuBar: Bool = true,
-        lexicon: PersonalLexicon = PersonalLexicon()
+        lexicon: PersonalLexicon = PersonalLexicon(),
+        selectedStyleID: UUID? = nil,
+        customStyles: [TranscriptionStyle] = [],
+        languageModel: LanguageModelProfile? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
@@ -35,6 +43,9 @@ struct VoxiSettings: Codable, Equatable {
         self.autoInsertEnabled = autoInsertEnabled
         self.showInterimTextInMenuBar = showInterimTextInMenuBar
         self.lexicon = lexicon
+        self.selectedStyleID = selectedStyleID
+        self.customStyles = customStyles
+        self.languageModel = languageModel
     }
 
     /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
@@ -47,11 +58,20 @@ struct VoxiSettings: Codable, Equatable {
         profiles.first
     }
 
+    /// 当前选中的整理风格；未选择或已删除时回落到原文。
+    var activeStyle: TranscriptionStyle {
+        guard let selectedStyleID else { return .raw }
+        return TranscriptionStyle.builtIns.first { $0.id == selectedStyleID }
+            ?? customStyles.first { $0.id == selectedStyleID }
+            ?? .raw
+    }
+
     // MARK: - 迁移
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
-             textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon
+             textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon,
+             selectedStyleID, customStyles, languageModel
     }
 
     /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
@@ -73,6 +93,9 @@ struct VoxiSettings: Codable, Equatable {
         autoInsertEnabled = try container.decodeIfPresent(Bool.self, forKey: .autoInsertEnabled) ?? true
         showInterimTextInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showInterimTextInMenuBar) ?? true
         lexicon = try container.decodeIfPresent(PersonalLexicon.self, forKey: .lexicon) ?? PersonalLexicon()
+        selectedStyleID = try container.decodeIfPresent(UUID.self, forKey: .selectedStyleID)
+        customStyles = try container.decodeIfPresent([TranscriptionStyle].self, forKey: .customStyles) ?? []
+        languageModel = try container.decodeIfPresent(LanguageModelProfile.self, forKey: .languageModel)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -86,6 +109,9 @@ struct VoxiSettings: Codable, Equatable {
         try container.encode(autoInsertEnabled, forKey: .autoInsertEnabled)
         try container.encode(showInterimTextInMenuBar, forKey: .showInterimTextInMenuBar)
         try container.encode(lexicon, forKey: .lexicon)
+        try container.encodeIfPresent(selectedStyleID, forKey: .selectedStyleID)
+        try container.encode(customStyles, forKey: .customStyles)
+        try container.encodeIfPresent(languageModel, forKey: .languageModel)
     }
 }
 

@@ -169,7 +169,8 @@ final class AppCoordinatorTests: XCTestCase {
         recordingMode: RecordingMode = .holdToTalk,
         audioCapture: StubAudioCapture = StubAudioCapture(),
         provider: FakeTranscriptionProvider? = nil,
-        microphoneGate: MicrophoneAccessGating = StubMicrophoneGate(authorization: .granted, grants: true)
+        microphoneGate: MicrophoneAccessGating = StubMicrophoneGate(authorization: .granted, grants: true),
+        styleProcessor: @escaping (String, VoxiSettings) async throws -> String = { text, _ in text }
     ) -> (AppCoordinator, SettingsStore, AppState, FakeTranscriptionProvider) {
         let provider = provider ?? FakeTranscriptionProvider()
         let suite = "test.\(UUID().uuidString)"
@@ -185,7 +186,8 @@ final class AppCoordinatorTests: XCTestCase {
             audioCapture: audioCapture,
             providers: [provider],
             textInserter: textInserter,
-            frontmostProvider: frontmost
+            frontmostProvider: frontmost,
+            styleProcessor: styleProcessor
         )
         return (coordinator, store, state, provider)
     }
@@ -762,5 +764,43 @@ final class AppCoordinatorTests: XCTestCase {
         await waitFor(timeout: 4) { state.state == .idle }
 
         XCTAssertEqual(state.lastResult?.text, "Voxi 你好")
+    }
+
+    func testStyleProcessorRewritesFinalResult() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "原始文本"
+        let (coordinator, store, state, _) = makeCoordinator(
+            provider: provider,
+            styleProcessor: { text, _ in "【\(text)】" }
+        )
+        store.settings.selectedStyleID = TranscriptionStyle.simple.id
+        store.settings.autoInsertEnabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle }
+
+        XCTAssertEqual(state.lastResult?.text, "【原始文本】")
+    }
+
+    func testStyleFailureFallsBackToRawText() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "原始文本"
+        let (coordinator, store, state, _) = makeCoordinator(
+            provider: provider,
+            styleProcessor: { _, _ in throw StyleProcessingError.emptyResult }
+        )
+        store.settings.selectedStyleID = TranscriptionStyle.simple.id
+        store.settings.autoInsertEnabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle }
+
+        XCTAssertEqual(state.state, .idle)
+        XCTAssertEqual(state.lastResult?.text, "原始文本")
+        XCTAssertTrue(state.noticeMessage?.contains("风格处理失败") ?? false)
     }
 }

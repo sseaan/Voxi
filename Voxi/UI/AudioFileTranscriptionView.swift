@@ -178,12 +178,31 @@ final class AudioFileTranscriptionModel: ObservableObject {
             try Task.checkCancellation()
             do {
                 let text = try await transcribe(result: result, profile: profile)
+                var styledText = text
+                var styleFailure: String?
+                let style = settings.settings.activeStyle
+                if style.requiresLLM {
+                    phase = .transcribing(-1)
+                    notice = "正在按「\(style.name)」整理…"
+                    do {
+                        styledText = try await StyleProcessor.process(
+                            text: text,
+                            settings: settings.settings
+                        )
+                        try Task.checkCancellation()
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch {
+                        if Task.isCancelled { throw CancellationError() }
+                        styleFailure = "风格处理失败，已使用原文：\(error.localizedDescription)"
+                    }
+                }
                 let finalText = settings.settings.textMode.finalize(
-                    settings.settings.lexicon.replacing(in: text)
+                    settings.settings.lexicon.replacing(in: styledText)
                 )
                 phase = .done(finalText)
                 interimText = ""
-                notice = nil
+                notice = styleFailure
                 return
             } catch is CancellationError {
                 throw CancellationError()
