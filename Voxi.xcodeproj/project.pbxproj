@@ -30,11 +30,9 @@
 		449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */; };
 		46245518D89E9D915E0C4CF7 /* AudioConversionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48541423C4189BA56AEAC747 /* AudioConversionTests.swift */; };
 		4AFE686CE17E333663CB23DC /* VolcengineStreamingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66D5C6564A6E04404D91491 /* VolcengineStreamingProvider.swift */; };
-		590CBADA6789367FE27C3555 /* volcengine-protocol.md in Resources */ = {isa = PBXBuildFile; fileRef = AFD55BA073A2CCD5504148E4 /* volcengine-protocol.md */; };
 		5AE7C622229FB726E62A279D /* RealServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CDBE6E17294DFD97106C0C7 /* RealServiceIntegrationTests.swift */; };
 		5E4076B470239E4DED6A0C3A /* TranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */; };
 		6477B3F8392989848DA658A4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 887ADCAFE62F37B22776D369 /* Assets.xcassets */; };
-		6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */; };
 		6DA7D70E28B439B11060217C /* StyleProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7E2043C750358D844318374 /* StyleProcessor.swift */; };
 		70EC516514FD8F62F769A637 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F83CACA557A637645E3C50B /* KeychainServiceTests.swift */; };
 		74FD45EE4B05834E9091C379 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BDF7FFF4B1120ACA1C358AD /* StatusItemController.swift */; };
@@ -111,7 +109,6 @@
 		4E3F65CF1924B612B1715A7E /* VolcengineStreamingProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolcengineStreamingProviderTests.swift; sourceTree = "<group>"; };
 		562C0D83C7EDDC11FE5259FF /* OnboardingWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWindowController.swift; sourceTree = "<group>"; };
 		57C9E45456AA639B9D729E82 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
-		5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoxiTests.swift; sourceTree = "<group>"; };
 		5F83CACA557A637645E3C50B /* KeychainServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainServiceTests.swift; sourceTree = "<group>"; };
 		635FCC88AB1DB58299AD0802 /* ChatCompletionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCompletionService.swift; sourceTree = "<group>"; };
 		65B02444E0468FC79901F637 /* LaunchAtLoginService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginService.swift; sourceTree = "<group>"; };
@@ -134,7 +131,6 @@
 		A8037205209E246ED13395AF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		AB86C98F48A71BE267A2BC27 /* TranscriptionStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionStyle.swift; sourceTree = "<group>"; };
 		ABBB641B5E4A0EB451E611A9 /* RecordingIndicatorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorController.swift; sourceTree = "<group>"; };
-		AFD55BA073A2CCD5504148E4 /* volcengine-protocol.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volcengine-protocol.md"; sourceTree = "<group>"; };
 		AFE1A2CCC8BD72263589EB87 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionServiceTests.swift; sourceTree = "<group>"; };
 		B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutServiceTests.swift; sourceTree = "<group>"; };
@@ -254,14 +250,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		8E70CF03B0CE5069AEE1250F /* Fixtures */ = {
-			isa = PBXGroup;
-			children = (
-				AFD55BA073A2CCD5504148E4 /* volcengine-protocol.md */,
-			);
-			path = Fixtures;
-			sourceTree = "<group>";
-		};
 		D80B928CBEEEC48E5420C5FE /* Support */ = {
 			isa = PBXGroup;
 			children = (
@@ -299,8 +287,6 @@
 				B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */,
 				4E3F65CF1924B612B1715A7E /* VolcengineStreamingProviderTests.swift */,
 				B8B87F00B5189CFE5F74C207 /* VolcengineWebSocketCodecTests.swift */,
-				5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */,
-				8E70CF03B0CE5069AEE1250F /* Fixtures */,
 			);
 			path = VoxiTests;
 			sourceTree = "<group>";
@@ -323,7 +309,6 @@
 			buildConfigurationList = E70FC897206BB3F2C4C36A9D /* Build configuration list for PBXNativeTarget "VoxiTests" */;
 			buildPhases = (
 				AB398E03C9094AE204FE7941 /* Sources */,
-				8682057B7B7A49C2DE514299 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -400,14 +385,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				6477B3F8392989848DA658A4 /* Assets.xcassets in Resources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		8682057B7B7A49C2DE514299 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				590CBADA6789367FE27C3555 /* volcengine-protocol.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -488,7 +465,6 @@
 				AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */,
 				776BDDF3225B0A1F31C770D4 /* VolcengineStreamingProviderTests.swift in Sources */,
 				F4B869267B5F8CF39757934C /* VolcengineWebSocketCodecTests.swift in Sources */,
-				6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

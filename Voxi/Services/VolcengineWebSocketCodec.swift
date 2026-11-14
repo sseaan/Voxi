@@ -2,7 +2,7 @@ import Foundation
 
 /// 火山引擎流式 ASR 二进制协议 codec。
 ///
-/// 协议依据（v3 sauc，见 `VoxiTests/Fixtures/volcengine-protocol.md`）：
+/// 协议依据（v3 sauc，见 `docs/volcengine-protocol.md`）：
 /// - 4 字节 header: version|headerSize, messageType|flags, serialization|compression, reserved
 /// - 4 字节大端 payload size；当 flags 最低位为 1 时，还有 4 字节大端 sequence
 /// - payload：JSON（gzip 压缩）或原始音频（按 header 声明压缩）

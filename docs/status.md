@@ -31,7 +31,7 @@
 | 5.1 | Release 自签名构建 | `dist/Voxi.app` codesign 有效；`spctl` 本机 accepted（因本机信任该证书） |
 | 5.2 | 打包与首次启动 | `dist/Voxi.zip` + `README-FIRST-LAUNCH.txt` + `manifest.txt`；用户在干净环境完成 Gatekeeper 首次启动，无问题 |
 
-自动化测试：`xcodebuild test ...` 共 **196 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
+自动化测试：`xcodebuild test ...` 共 **195 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
 
 ## 本轮修复的问题
 
