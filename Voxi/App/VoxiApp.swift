@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var appState: AppState!
     private var coordinator: AppCoordinator!
     private var statusItem: StatusItemController!
+    private var recordingIndicator: RecordingIndicatorController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = SettingsStore()
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.appState = state
         self.coordinator = coordinator
         self.statusItem = StatusItemController(settings: settings, appState: state, coordinator: coordinator)
+        self.recordingIndicator = RecordingIndicatorController(appState: state)
         coordinator.activate()
     }
 

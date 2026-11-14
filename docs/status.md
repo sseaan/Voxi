@@ -122,3 +122,34 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 - 菜单栏开始录音 → 焦点回到原应用 → 松键后文字是否输入到原应用。
 - 设置页排版与保存反馈（上一轮已确认正常）。
 - Keychain 弹窗选择「始终允许」后，重新启动 App 是否不再弹窗。
+
+## 第三轮功能新增（2026-11-14 傍晚）
+
+1. **Fn / 右 Option 单键快捷键**
+   - Carbon 热键无法注册左右修饰键，新增 `NSEvent` 全局/本地 `flagsChanged` 监听。
+   - 仅在配置为 `Fn`（keyCode 63）或 `右 Option`（keyCode 61）时启用；普通字母/数字仍需修饰键。
+   - 依赖辅助功能权限；未授权时保存会提示。
+   - 注意：部分键盘的 Fn/Globe 键可能被系统占用，需实机确认。
+2. **Dock 上方录音浮条**
+   - `RecordingIndicatorController`：268×60 无边框面板，位于当前屏幕 Dock 上方居中。
+   - 显示红点、计时与 18 段实时音量波形；`ignoresMouseEvents = true`，不抢焦点。
+   - 仅在 `recording` 状态显示，停止后立即隐藏。
+3. **应用图标**
+   - `scripts/dev/generate-app-icon.swift` 生成 1024 底图与 16–512@2x 全套 PNG。
+   - 蓝紫渐变 + 白色波形；接入 `Assets.xcassets/AppIcon`。
+4. **音频文件转文字**
+   - 菜单栏新增「转写音频…」；`AudioFileConverter` 统一转成 16 kHz 单声道 PCM16 WAV。
+   - OpenAI-compatible：整段上传；火山：按 200ms 分片以 150ms 间隔流式发送。
+   - 结果窗口支持复制与插入前台应用；临时文件在关闭/取消时删除。
+   - 火山长文件耗时接近音频时长，界面会显示进度与临时文本。
+5. **稳定性补充**
+   - 菜单栏触发录音时恢复上一个前台应用；识别开始前锁定 PID。
+   - 连接期间缓冲音频并在就绪后按 100ms 节奏补发；连接中松键改为完成而非丢弃。
+   - WebSocket 握手/首包 8s 超时；Keychain 读取移到后台，避免阻塞主线程。
+
+### 待用户实测
+
+- Fn / 右 Option 单键触发（需先选“始终允许”钥匙串授权）。
+- 录音浮条位置、波形与计时；确认不遮挡/不抢点击。
+- Finder 中 App 图标显示。
+- 「转写音频…」用 mp3/m4a/wav 各试一次，两种 provider 的复制/插入。

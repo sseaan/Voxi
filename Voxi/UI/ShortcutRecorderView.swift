@@ -69,10 +69,37 @@ final class ShortcutRecorderNSView: NSView {
         guard !isCapturing else { return }
         isCapturing = true
         window?.makeFirstResponder(self)
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self, self.isCapturing else { return event }
+            if event.type == .flagsChanged {
+                self.handleFlagsChanged(event)
+                return event
+            }
             return self.handleKeyDown(event)
         }
+    }
+
+    /// Fn / 右 Option 通过 flagsChanged 捕获，作为单键快捷键。
+    private func handleFlagsChanged(_ event: NSEvent) {
+        let keyCode = UInt32(event.keyCode)
+        if keyCode == ShortcutConfiguration.fnKeyCode,
+           event.modifierFlags.contains(.function) {
+            accept(ShortcutConfiguration(keyCode: keyCode, carbonModifiers: 0))
+        } else if keyCode == ShortcutConfiguration.rightOptionKeyCode,
+                  event.modifierFlags.contains(.option) {
+            accept(ShortcutConfiguration(keyCode: keyCode, carbonModifiers: 0))
+        }
+    }
+
+    private func accept(_ configuration: ShortcutConfiguration) {
+        guard configuration.isValid else {
+            onInvalid?("快捷键至少需要一个修饰键（⌃⌥⇧⌘）和一个支持的按键。")
+            endCapture()
+            return
+        }
+        self.configuration = configuration
+        endCapture()
+        onRecord?(configuration)
     }
 
     private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
@@ -81,7 +108,7 @@ final class ShortcutRecorderNSView: NSView {
             endCapture()
             return nil
         }
-        // 纯修饰键不构成快捷键
+        // 纯修饰键不构成普通组合键（Fn / 右 Option 走 flagsChanged）
         if [54, 55, 56, 57, 58, 59, 60, 61, 62, 63].contains(Int(event.keyCode)) {
             return nil
         }

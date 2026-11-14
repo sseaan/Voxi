@@ -136,7 +136,7 @@ struct GeneralSettingsView: View {
 
             SettingsCard(
                 "全局快捷键",
-                footer: shortcutMessage ?? "点击快捷键框后按下新的组合键。组合键冲突时会在菜单栏提示。"
+                footer: shortcutMessage ?? "点击快捷键框后按下组合键；也支持单键 Fn / 右 Option（需要辅助功能权限）。"
             ) {
                 SettingsRow("组合键") {
                     ShortcutRecorderView(

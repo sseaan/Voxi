@@ -156,6 +156,72 @@ final class WAVFileWriterTests: XCTestCase {
     }
 }
 
+final class AudioFileConverterTests: XCTestCase {
+    func testConverts44kStereoFileTo16kMonoWAV() throws {
+        let directory = FileManager.default.temporaryDirectory
+        let source = directory.appendingPathComponent("src-\(UUID().uuidString).wav")
+        let destination = directory.appendingPathComponent("dst-\(UUID().uuidString).wav")
+        defer {
+            try? FileManager.default.removeItem(at: source)
+            try? FileManager.default.removeItem(at: destination)
+        }
+
+        // 生成 1 秒 44.1kHz 立体声 WAV 源文件
+        let writer = try WAVFileWriter(url: source, sampleRate: 44_100, channelCount: 2, bitsPerSample: 16)
+        var pcm = Data()
+        for index in 0..<44_100 {
+            let value = Int16(2_000 * sin(2 * .pi * 440 * Double(index) / 44_100))
+            for _ in 0..<2 {
+                withUnsafeBytes(of: value.littleEndian) { pcm.append(contentsOf: $0) }
+            }
+        }
+        try writer.append(pcm)
+        try writer.finalize()
+
+        var lastProgress = 0.0
+        let result = try AudioFileConverter.convertToPCM16WAV(source: source, destination: destination) { progress in
+            lastProgress = progress
+        }
+
+        XCTAssertEqual(lastProgress, 1.0, accuracy: 0.001)
+        XCTAssertEqual(result.duration, 1.0, accuracy: 0.05)
+        XCTAssertGreaterThan(result.sampleCount, 15_000)
+        XCTAssertLessThan(result.sampleCount, 17_000)
+
+        let converted = try AVAudioFile(forReading: destination)
+        XCTAssertEqual(converted.fileFormat.sampleRate, 16_000, accuracy: 0.01)
+        XCTAssertEqual(converted.fileFormat.channelCount, 1)
+    }
+
+    func testUnsupportedOrEmptyFileThrows() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("empty-\(UUID().uuidString).wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data("not audio".utf8).write(to: url)
+        XCTAssertThrowsError(try AudioFileConverter.convertToPCM16WAV(
+            source: url,
+            destination: FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID().uuidString).wav")
+        ))
+    }
+}
+
+final class AudioLevelTests: XCTestCase {
+    func testSilenceLevelIsZero() {
+        let silence = Data(repeating: 0, count: 6_400)
+        XCTAssertEqual(AppCoordinator.audioLevel(fromPCM16: silence), 0, accuracy: 0.001)
+    }
+
+    func testLoudSineLevelIsWithinRange() {
+        var data = Data()
+        for index in 0..<3_200 {
+            let value = Int16(16_000 * sin(2 * .pi * 220 * Double(index) / 16_000))
+            withUnsafeBytes(of: value.littleEndian) { data.append(contentsOf: $0) }
+        }
+        let level = AppCoordinator.audioLevel(fromPCM16: data)
+        XCTAssertGreaterThan(level, 0.3)
+        XCTAssertLessThanOrEqual(level, 1.0)
+    }
+}
+
 final class PCMChunkerTests: XCTestCase {
     func testSplitsIntoExactChunksAndKeepsRemainder() {
         var chunker = PCMChunker(chunkByteCount: 6_400)

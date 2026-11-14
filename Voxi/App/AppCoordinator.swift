@@ -388,6 +388,7 @@ final class AppCoordinator: ObservableObject {
             for await chunk in stream {
                 guard let self, self.currentSessionID == sessionID else { return }
                 self.capturedByteCount += chunk.count
+                self.appState.updateAudioLevel(Self.audioLevel(fromPCM16: chunk))
                 await self.sendOrBufferAudio(chunk, sessionID: sessionID)
             }
         }
@@ -583,6 +584,26 @@ final class AppCoordinator: ObservableObject {
     private func finishSession() {
         currentSessionID = nil
         appState.endSession()
+    }
+
+    /// 计算 PCM16 单声道的归一化 RMS 音量（0...1），仅用于录音浮条。
+    nonisolated static func audioLevel(fromPCM16 data: Data) -> Float {
+        guard data.count >= 2 else { return 0 }
+        var sum: Double = 0
+        var count = 0
+        data.withUnsafeBytes { raw in
+            let samples = raw.bindMemory(to: Int16.self)
+            for sample in samples {
+                let value = Double(sample) / 32_768.0
+                sum += value * value
+                count += 1
+            }
+        }
+        guard count > 0 else { return 0 }
+        let rms = sqrt(sum / Double(count))
+        // 放大到可读范围，并以平方根压缩动态范围。
+        let amplified = min(1.0, rms * 6.0)
+        return Float(sqrt(amplified))
     }
 
     private func transition(to newState: RecordingState, startedAt: Date? = nil) {

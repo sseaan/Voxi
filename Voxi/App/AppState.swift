@@ -34,6 +34,8 @@ final class AppState: ObservableObject {
     /// 最近一次最终结果，用于自动输入失败时的复制回退。
     @Published private(set) var lastResult: TranscriptionResult?
     @Published private(set) var lastLogID: String?
+    /// 最近约 36 个 200ms 音频片段的归一化音量，用于录音浮条波形。
+    @Published private(set) var audioLevels: [Float] = []
 
     var errorMessage: String? { error?.message }
 
@@ -45,8 +47,18 @@ final class AppState: ObservableObject {
         interimText = ""
         lastResult = nil
         lastLogID = nil
+        audioLevels = []
         error = nil
         noticeMessage = nil
+    }
+
+    func updateAudioLevel(_ level: Float) {
+        var levels = audioLevels
+        levels.append(max(0, min(1, level)))
+        if levels.count > 36 {
+            levels.removeFirst(levels.count - 36)
+        }
+        audioLevels = levels
     }
 
     func updateState(_ newState: RecordingState, startedAt: Date?) {
@@ -88,6 +100,7 @@ final class AppState: ObservableObject {
         sessionID = nil
         interimText = ""
         recordingStartedAt = nil
+        audioLevels = []
     }
 }
 

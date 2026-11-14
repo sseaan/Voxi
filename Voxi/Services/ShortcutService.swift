@@ -49,6 +49,7 @@ final class ShortcutService {
         case invalidCombination
         case conflict
         case systemFailure(OSStatus)
+        case accessibilityRequired
 
         var errorDescription: String? {
             switch self {
@@ -58,6 +59,8 @@ final class ShortcutService {
                 return "该快捷键已被其他应用占用，请换一个组合。"
             case .systemFailure(let status):
                 return "快捷键注册失败（OSStatus \(status)）。"
+            case .accessibilityRequired:
+                return "Fn / 右 Option 单键需要辅助功能权限才能全局监听，请先在设置中授权。"
             }
         }
     }
@@ -67,6 +70,9 @@ final class ShortcutService {
 
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandlerRef: EventHandlerRef?
+    private var modifierGlobalMonitor: Any?
+    private var modifierLocalMonitor: Any?
+    private var isModifierDown = false
     private var isKeyDown = false
     private(set) var registeredShortcut: ShortcutConfiguration?
 
@@ -78,6 +84,13 @@ final class ShortcutService {
         }
 
         unregister()
+
+        if configuration.isModifierOnly {
+            try installModifierMonitor(configuration)
+            registeredShortcut = configuration
+            Logger.shortcut.info("已注册单键修饰符快捷键 \(configuration.displayString, privacy: .public)")
+            return
+        }
 
         var hotKeyID = EventHotKeyID(signature: OSType(0x5658_4F49), id: 1) // 'VXOI'
         var hotKeyRef: EventHotKeyRef?
@@ -129,13 +142,72 @@ final class ShortcutService {
             RemoveEventHandler(eventHandlerRef)
         }
         eventHandlerRef = nil
+        removeModifierMonitor()
         registeredShortcut = nil
         isKeyDown = false
+        isModifierDown = false
+    }
+
+    // MARK: - Fn / 右 Option 单键
+
+    private func installModifierMonitor(_ configuration: ShortcutConfiguration) throws {
+        guard AXIsProcessTrusted() else {
+            throw RegistrationError.accessibilityRequired
+        }
+
+        let handler: (NSEvent) -> Void = { [weak self] event in
+            Task { @MainActor in
+                self?.handleModifierEvent(event)
+            }
+        }
+        modifierGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { event in
+            handler(event)
+        }
+        modifierLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
+            handler(event)
+            return event
+        }
+        if modifierGlobalMonitor == nil && modifierLocalMonitor == nil {
+            throw RegistrationError.accessibilityRequired
+        }
+        _ = configuration
+    }
+
+    private func removeModifierMonitor() {
+        if let modifierGlobalMonitor {
+            NSEvent.removeMonitor(modifierGlobalMonitor)
+        }
+        modifierGlobalMonitor = nil
+        if let modifierLocalMonitor {
+            NSEvent.removeMonitor(modifierLocalMonitor)
+        }
+        modifierLocalMonitor = nil
+    }
+
+    private func handleModifierEvent(_ event: NSEvent) {
+        guard let configuration = registeredShortcut, configuration.isModifierOnly else { return }
+        guard UInt32(event.keyCode) == configuration.keyCode else { return }
+
+        let pressed: Bool
+        if configuration.keyCode == ShortcutConfiguration.fnKeyCode {
+            pressed = event.modifierFlags.contains(.function)
+        } else {
+            pressed = event.modifierFlags.contains(.option)
+        }
+
+        if pressed, !isModifierDown {
+            isModifierDown = true
+            onPress?()
+        } else if !pressed, isModifierDown {
+            isModifierDown = false
+            onRelease?()
+        }
     }
 
     /// 按键状态复位（例如应用失焦后松开事件丢失）。
     func resetKeyState() {
         isKeyDown = false
+        isModifierDown = false
     }
 
     fileprivate func handleEvent(kind: UInt32) {

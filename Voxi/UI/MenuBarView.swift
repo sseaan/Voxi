@@ -9,6 +9,7 @@ struct MenuBarView: View {
     var onRequestClose: (() -> Void)?
     var onStartRecording: (() -> Void)?
     var onStopRecording: (() -> Void)?
+    var onTranscribeAudio: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -221,6 +222,14 @@ struct MenuBarView: View {
                 )
             } label: {
                 Label("设置…", systemImage: "gearshape")
+            }
+            .buttonStyle(.link)
+
+            Button {
+                onRequestClose?()
+                onTranscribeAudio?()
+            } label: {
+                Label("转写音频…", systemImage: "waveform.badge.plus")
             }
             .buttonStyle(.link)
 

@@ -15,9 +15,11 @@
 		1E91CC24B28460B53795E674 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFE1A2CCC8BD72263589EB87 /* AppState.swift */; };
 		1EB3DF67B59B4C9F2AFEF13F /* GzipShim.m in Sources */ = {isa = PBXBuildFile; fileRef = 40FF2507C98B65F7B1B54B61 /* GzipShim.m */; };
 		209FB176BC28024B4A616A0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8037205209E246ED13395AF /* SettingsView.swift */; };
+		20CF732A0C98159EBD64099F /* AudioFileTranscriptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */; };
 		23CAAF0A556E5213CD150583 /* TextModeEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */; };
 		2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CF2E6E997AB8C79132D0F3 /* AudioCaptureService.swift */; };
 		33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */; };
+		35002225224AD73A25264C9F /* RecordingIndicatorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABBB641B5E4A0EB451E611A9 /* RecordingIndicatorController.swift */; };
 		38BB73D613FE0BBC327A4165 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 72E44A085BCA3EFB4E954292 /* AppCoordinator.swift */; };
 		3B404FD53DF7832BB8468B0D /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A66E5B6D6978CD006477604B /* KeychainService.swift */; };
 		449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */; };
@@ -26,6 +28,7 @@
 		590CBADA6789367FE27C3555 /* volcengine-protocol.md in Resources */ = {isa = PBXBuildFile; fileRef = AFD55BA073A2CCD5504148E4 /* volcengine-protocol.md */; };
 		5AE7C622229FB726E62A279D /* RealServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CDBE6E17294DFD97106C0C7 /* RealServiceIntegrationTests.swift */; };
 		5E4076B470239E4DED6A0C3A /* TranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */; };
+		6477B3F8392989848DA658A4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 887ADCAFE62F37B22776D369 /* Assets.xcassets */; };
 		6B8594353D7D4A7A1A3A7DB0 /* VoxiTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F75E0AE71281E0C2A009B24 /* VoxiTests.swift */; };
 		70EC516514FD8F62F769A637 /* KeychainServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F83CACA557A637645E3C50B /* KeychainServiceTests.swift */; };
 		74FD45EE4B05834E9091C379 /* StatusItemController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BDF7FFF4B1120ACA1C358AD /* StatusItemController.swift */; };
@@ -35,6 +38,7 @@
 		817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C915665C4131D29A46F25A /* RecordingState.swift */; };
 		849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */; };
 		894D5C137670E8C6F3E522D0 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA07218F732FAF6C028A66A /* SettingsComponents.swift */; };
+		8A2B48A3679448FF868F2BD2 /* AudioFileConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F067217F4BE9651B3005BC /* AudioFileConverter.swift */; };
 		9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */; };
 		AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */; };
 		AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */; };
@@ -96,12 +100,15 @@
 		753BE72EC2BAE04088D177C4 /* VolcengineWebSocketCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolcengineWebSocketCodec.swift; sourceTree = "<group>"; };
 		76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipartFormData.swift; sourceTree = "<group>"; };
 		7FC5595E22A9F7D5F2997552 /* Voxi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Voxi.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		887ADCAFE62F37B22776D369 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		88F067217F4BE9651B3005BC /* AudioFileConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileConverter.swift; sourceTree = "<group>"; };
 		8CADAA4F9510669F40A1C63A /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		95DE5E659AE18B0DD52D0CDA /* OpenAICompatibleProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleProviderTests.swift; sourceTree = "<group>"; };
 		99076712E036C9926F2FF860 /* PermissionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionService.swift; sourceTree = "<group>"; };
 		A27D706A15E2808D94A2587C /* Gzip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Gzip.swift; sourceTree = "<group>"; };
 		A66E5B6D6978CD006477604B /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		A8037205209E246ED13395AF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		ABBB641B5E4A0EB451E611A9 /* RecordingIndicatorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingIndicatorController.swift; sourceTree = "<group>"; };
 		AFD55BA073A2CCD5504148E4 /* volcengine-protocol.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "volcengine-protocol.md"; sourceTree = "<group>"; };
 		AFE1A2CCC8BD72263589EB87 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionServiceTests.swift; sourceTree = "<group>"; };
@@ -111,6 +118,7 @@
 		BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointProfile.swift; sourceTree = "<group>"; };
 		BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointEditorView.swift; sourceTree = "<group>"; };
 		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
+		D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileTranscriptionView.swift; sourceTree = "<group>"; };
 		E1D36565ECDB1D74960D92BE /* TextInsertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionService.swift; sourceTree = "<group>"; };
 		E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProvider.swift; sourceTree = "<group>"; };
 		EBC1B11E5EC2F1A4A06725F8 /* Voxi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Voxi-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -155,6 +163,7 @@
 		2C6FC7088C08C8BED3B73656 /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */,
 				BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */,
 				6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */,
 				8CADAA4F9510669F40A1C63A /* MenuBarView.swift */,
@@ -164,6 +173,14 @@
 				3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */,
 			);
 			path = UI;
+			sourceTree = "<group>";
+		};
+		2E4C1BEAA49611AD4D3B8A17 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				887ADCAFE62F37B22776D369 /* Assets.xcassets */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		462E4FCB174E484C33B32915 = {
@@ -180,6 +197,7 @@
 			children = (
 				F5C0189EBD2C3645A8C86A77 /* App */,
 				10889C1692D1193DB80FD076 /* Models */,
+				2E4C1BEAA49611AD4D3B8A17 /* Resources */,
 				1B28536F7CC88DAED96C08C8 /* Services */,
 				D80B928CBEEEC48E5420C5FE /* Support */,
 				2C6FC7088C08C8BED3B73656 /* UI */,
@@ -207,11 +225,13 @@
 		D80B928CBEEEC48E5420C5FE /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				88F067217F4BE9651B3005BC /* AudioFileConverter.swift */,
 				A27D706A15E2808D94A2587C /* Gzip.swift */,
 				41BCB971E6CFA8CF90864456 /* GzipShim.h */,
 				40FF2507C98B65F7B1B54B61 /* GzipShim.m */,
 				57C9E45456AA639B9D729E82 /* Logger.swift */,
 				76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */,
+				ABBB641B5E4A0EB451E611A9 /* RecordingIndicatorController.swift */,
 				0765F3B1517F7C139568E4FF /* SettingsWindowController.swift */,
 				0BDF7FFF4B1120ACA1C358AD /* StatusItemController.swift */,
 				EBC1B11E5EC2F1A4A06725F8 /* Voxi-Bridging-Header.h */,
@@ -277,6 +297,7 @@
 			buildConfigurationList = B1B189510BA8A6582881CD1D /* Build configuration list for PBXNativeTarget "Voxi" */;
 			buildPhases = (
 				616BD8DCA648B4CDCE4FC3DD /* Sources */,
+				7C99133C5B1E4A4715F32425 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -329,6 +350,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		7C99133C5B1E4A4715F32425 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6477B3F8392989848DA658A4 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8682057B7B7A49C2DE514299 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -347,6 +376,8 @@
 				38BB73D613FE0BBC327A4165 /* AppCoordinator.swift in Sources */,
 				1E91CC24B28460B53795E674 /* AppState.swift in Sources */,
 				2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */,
+				8A2B48A3679448FF868F2BD2 /* AudioFileConverter.swift in Sources */,
+				20CF732A0C98159EBD64099F /* AudioFileTranscriptionView.swift in Sources */,
 				04496559C79CE3C6842F056A /* EndpointEditorView.swift in Sources */,
 				149277C3EFA76F001653D154 /* EndpointProfile.swift in Sources */,
 				B03E02AA4D0D0A13474F5C22 /* EndpointTestView.swift in Sources */,
@@ -358,6 +389,7 @@
 				EAA81FEED526CD5179958DB2 /* MultipartFormData.swift in Sources */,
 				AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */,
 				DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */,
+				35002225224AD73A25264C9F /* RecordingIndicatorController.swift in Sources */,
 				7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */,
 				817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */,
 				894D5C137670E8C6F3E522D0 /* SettingsComponents.swift in Sources */,

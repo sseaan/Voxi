@@ -87,6 +87,25 @@ final class ShortcutConfigurationTests: XCTestCase {
         XCTAssertFalse(config.isValid)
     }
 
+    func testModifierOnlyShortcutsAreValid() {
+        let fn = ShortcutConfiguration(keyCode: ShortcutConfiguration.fnKeyCode, carbonModifiers: 0)
+        XCTAssertTrue(fn.isValid)
+        XCTAssertTrue(fn.isModifierOnly)
+        XCTAssertEqual(fn.displayString, "Fn")
+        XCTAssertTrue(fn.requiresAccessibility)
+
+        let rightOption = ShortcutConfiguration(keyCode: ShortcutConfiguration.rightOptionKeyCode, carbonModifiers: 0)
+        XCTAssertTrue(rightOption.isValid)
+        XCTAssertTrue(rightOption.isModifierOnly)
+        XCTAssertEqual(rightOption.displayString, "右 ⌥")
+    }
+
+    func testPlainKeyWithoutModifierIsInvalid() {
+        let space = ShortcutConfiguration(keyCode: 0x31, carbonModifiers: 0)
+        XCTAssertFalse(space.isValid)
+        XCTAssertFalse(space.isModifierOnly)
+    }
+
     func testDisplayStringOrdering() {
         let config = ShortcutConfiguration(
             keyCode: 0x00, // A

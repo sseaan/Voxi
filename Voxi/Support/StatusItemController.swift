@@ -18,6 +18,8 @@ final class StatusItemController: NSObject {
     private var pendingLayout: DispatchWorkItem?
     private var previousApp: NSRunningApplication?
     private let coordinator: AppCoordinator
+    private let settings: SettingsStore
+    private let appState: AppState
 
     /// 面板内容宽度（与 MenuBarView 的固定宽度一致）。
     private static let contentWidth: CGFloat = 340
@@ -26,6 +28,8 @@ final class StatusItemController: NSObject {
 
     init(settings: SettingsStore, appState: AppState, coordinator: AppCoordinator) {
         self.coordinator = coordinator
+        self.settings = settings
+        self.appState = appState
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
         let panel = NSPanel(
@@ -50,6 +54,9 @@ final class StatusItemController: NSObject {
             },
             onStopRecording: { [weak self] in
                 self?.stopRecordingFromPanel()
+            },
+            onTranscribeAudio: { [weak self] in
+                self?.openAudioFileTranscription()
             }
         )
         hosting = NSHostingController(rootView: root)
@@ -128,6 +135,15 @@ final class StatusItemController: NSObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
             self?.coordinator.startRecording()
         }
+    }
+
+    private func openAudioFileTranscription() {
+        let targetPID = previousApp?.processIdentifier
+        hidePanel()
+        AudioFileTranscriptionWindowController.shared.show(
+            settings: settings,
+            targetPID: targetPID
+        )
     }
 
     private func stopRecordingFromPanel() {

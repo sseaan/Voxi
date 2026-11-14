@@ -14,6 +14,14 @@ struct ShortcutConfiguration: Codable, Equatable {
         case control = 0x1000   // controlKey
     }
 
+    /// 只能作为“单键快捷键”使用的修饰键（Carbon 无法注册）。
+    static let fnKeyCode: UInt32 = 63
+    static let rightOptionKeyCode: UInt32 = 61
+
+    var isModifierOnly: Bool {
+        carbonModifiers == 0 && (keyCode == Self.fnKeyCode || keyCode == Self.rightOptionKeyCode)
+    }
+
     static let `default` = ShortcutConfiguration(
         keyCode: 0x31, // kVK_Space
         carbonModifiers: Modifier.control.rawValue | Modifier.option.rawValue
@@ -33,14 +41,22 @@ struct ShortcutConfiguration: Codable, Equatable {
         return names
     }
 
-    /// 供设置界面显示的文本，例如 `⌃⌥Space`。
+    /// 供设置界面显示的文本，例如 `⌃⌥Space`、`Fn`、`右 ⌥`。
     var displayString: String {
-        modifierNames.joined() + Self.keyName(for: keyCode)
+        if isModifierOnly {
+            return keyCode == Self.fnKeyCode ? "Fn" : "右 ⌥"
+        }
+        return modifierNames.joined() + Self.keyName(for: keyCode)
     }
 
-    /// 至少需要一个修饰键，避免抢占普通输入按键。
+    /// 普通组合键至少需要一个修饰键；Fn / 右 Option 允许作为单键。
     var isValid: Bool {
-        carbonModifiers != 0 && Self.keyName(for: keyCode) != "?"
+        if isModifierOnly { return true }
+        return carbonModifiers != 0 && Self.keyName(for: keyCode) != "?"
+    }
+
+    var requiresAccessibility: Bool {
+        isModifierOnly
     }
 
     private static let keyNames: [UInt32: String] = [

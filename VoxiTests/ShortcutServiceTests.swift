@@ -73,6 +73,19 @@ final class ShortcutRegistrationTests: XCTestCase {
         XCTAssertNil(service.registeredShortcut)
     }
 
+    func testModifierOnlyRegistrationWhenAccessibilityGranted() throws {
+        guard AXIsProcessTrusted() else {
+            throw XCTSkip("需要辅助功能权限才能监听 Fn / 右 Option")
+        }
+        let service = ShortcutService()
+        let fn = ShortcutConfiguration(keyCode: ShortcutConfiguration.fnKeyCode, carbonModifiers: 0)
+        defer { service.unregister() }
+        try service.register(fn)
+        XCTAssertEqual(service.registeredShortcut, fn)
+        service.unregister()
+        XCTAssertNil(service.registeredShortcut)
+    }
+
     func testRegisterAndUnregisterKeepsStateConsistent() throws {
         let service = ShortcutService()
         // 避开测试宿主 app 自己注册的默认组合键（⌃⌥Space）。
