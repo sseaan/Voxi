@@ -34,6 +34,7 @@
 		7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C819C7D57E572C842CA2968 /* RecordingMode.swift */; };
 		817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C915665C4131D29A46F25A /* RecordingState.swift */; };
 		849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */; };
+		894D5C137670E8C6F3E522D0 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA07218F732FAF6C028A66A /* SettingsComponents.swift */; };
 		9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */; };
 		AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */; };
 		AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */; };
@@ -70,6 +71,7 @@
 		0BDF7FFF4B1120ACA1C358AD /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
 		15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
+		1BA07218F732FAF6C028A66A /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionResult.swift; sourceTree = "<group>"; };
 		24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderView.swift; sourceTree = "<group>"; };
 		2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConfiguration.swift; sourceTree = "<group>"; };
@@ -156,6 +158,7 @@
 				BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */,
 				6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */,
 				8CADAA4F9510669F40A1C63A /* MenuBarView.swift */,
+				1BA07218F732FAF6C028A66A /* SettingsComponents.swift */,
 				A8037205209E246ED13395AF /* SettingsView.swift */,
 				24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */,
 				3C00E5751077F3AD35AE9483 /* TextModeEditorView.swift */,
@@ -357,6 +360,7 @@
 				DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */,
 				7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */,
 				817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */,
+				894D5C137670E8C6F3E522D0 /* SettingsComponents.swift in Sources */,
 				ECBB0737F33BD6372A269F1E /* SettingsStore.swift in Sources */,
 				209FB176BC28024B4A616A0B /* SettingsView.swift in Sources */,
 				1CA7033B728012C801A43FC4 /* SettingsWindowController.swift in Sources */,

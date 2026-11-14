@@ -4,6 +4,7 @@ import Security
 enum KeychainError: Error, LocalizedError, Equatable {
     case unexpectedStatus(OSStatus)
     case invalidSecretEncoding
+    case accessDenied
 
     var errorDescription: String? {
         switch self {
@@ -11,6 +12,8 @@ enum KeychainError: Error, LocalizedError, Equatable {
             return "Keychain 操作失败（OSStatus \(status)）。"
         case .invalidSecretEncoding:
             return "密钥内容无法编码。"
+        case .accessDenied:
+            return "Keychain 拒绝访问。请在弹出的系统对话框中输入登录密码并选择“始终允许”，或在设置中重新保存该密钥。"
         }
     }
 }
@@ -66,6 +69,9 @@ final class KeychainService {
             return secret
         case errSecItemNotFound:
             return nil
+        case errSecAuthFailed, errSecUserCanceled, errSecInteractionNotAllowed:
+            Logger.keychain.error("Keychain 访问被拒绝 status=\(status, privacy: .public)")
+            throw KeychainError.accessDenied
         default:
             Logger.keychain.error("读取凭据失败 status=\(status, privacy: .public)")
             throw KeychainError.unexpectedStatus(status)

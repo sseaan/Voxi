@@ -18,8 +18,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             let window = NSWindow(contentViewController: hosting)
             window.title = "Voxi 设置"
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-            window.setContentSize(NSSize(width: 620, height: 520))
-            window.minSize = NSSize(width: 560, height: 440)
+            window.setContentSize(NSSize(width: 760, height: 620))
+            window.minSize = NSSize(width: 700, height: 540)
             window.isReleasedWhenClosed = false
             window.center()
             window.delegate = self

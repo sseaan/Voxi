@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 识别服务列表 + 端点编辑器。
+/// 识别服务列表 + 端点编辑器（左右分栏）。
 struct EndpointListView: View {
     @ObservedObject var settings: SettingsStore
     @State private var selectedID: UUID?
@@ -11,9 +11,9 @@ struct EndpointListView: View {
     var body: some View {
         HSplitView {
             sidebar
-                .frame(minWidth: 200, maxWidth: 240)
+                .frame(minWidth: 210, maxWidth: 250)
             editor
-                .frame(minWidth: 360)
+                .frame(minWidth: 460)
         }
         .onAppear(perform: loadSelection)
         .onChange(of: selectedID) { _ in
@@ -24,37 +24,14 @@ struct EndpointListView: View {
         }
     }
 
-    private var sidebar: some View {
-        VStack(spacing: 0) {
-            List(selection: $selectedID) {
-                ForEach(settings.settings.profiles) { profile in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 4) {
-                            Text(profile.name.isEmpty ? "未命名" : profile.name)
-                                .font(.body.weight(.semibold))
-                            if !profile.validation().isValid {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                    .help(profile.validation().message ?? "")
-                            }
-                            if profile.id == settings.settings.activeProfileID {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .help("当前使用中的端点")
-                            }
-                        }
-                        Text(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎流式")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                    .tag(profile.id)
-                }
-            }
-            .listStyle(.inset)
+    // MARK: - 侧栏
 
-            Divider()
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
+                Text("端点")
+                    .font(.headline)
+                Spacer()
                 Menu {
                     Button("OpenAI-compatible 端点") { addProfile(.defaultOpenAIProfile()) }
                     Button("火山引擎流式端点") { addProfile(.defaultVolcengineProfile()) }
@@ -64,6 +41,7 @@ struct EndpointListView: View {
                 .menuStyle(.borderlessButton)
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .help("添加端点")
 
                 Button {
                     deleteSelected()
@@ -72,12 +50,64 @@ struct EndpointListView: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(settings.settings.profiles.count <= 1)
-
-                Spacer()
+                .help("删除当前端点")
             }
-            .padding(8)
+            .padding(.horizontal, 12)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+
+            List(selection: $selectedID) {
+                ForEach(settings.settings.profiles) { profile in
+                    row(for: profile)
+                        .tag(profile.id)
+                }
+            }
+            .listStyle(.sidebar)
+
+            Divider()
+            Text("勾选标记表示当前使用的端点。")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .background(Color(nsColor: .windowBackgroundColor))
     }
+
+    private func row(for profile: EndpointProfile) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: profile.kind == .openAICompatible
+                  ? "cloud" : "waveform.path.ecg")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(profile.name.isEmpty ? "未命名" : profile.name)
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                    if !profile.validation().isValid {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    if profile.id == settings.settings.activeProfileID {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    }
+                }
+                Text(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎流式")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 2)
+    }
+
+    // MARK: - 编辑器
 
     @ViewBuilder
     private var editor: some View {
@@ -100,11 +130,11 @@ struct EndpointListView: View {
                 }
             }
         } else {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 28))
+                    .font(.system(size: 30))
                     .foregroundStyle(.secondary)
-                Text("选择一个端点，或点击左下角 + 新建")
+                Text("选择一个端点，或点击左上角 + 新建")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -152,7 +182,13 @@ struct EndpointListView: View {
         }
         settings.updateActiveProfile(profile)
         draft = profile
-        saveMessage = "已保存并设为当前端点。"
+        saveMessage = "已保存并设为当前端点 · \(Self.timeString())"
+    }
+
+    static func timeString() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: Date())
     }
 }
 
@@ -173,138 +209,167 @@ struct EndpointEditorView: View {
     private let keychain = KeychainService.shared
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                generalSection
-                if draft.kind == .openAICompatible {
-                    openAISection
-                    customFieldsSection
-                } else {
-                    volcengineSection
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    header
+                    generalCard
+                    if draft.kind == .openAICompatible {
+                        openAICard
+                        customFieldsCard
+                    } else {
+                        volcengineCard
+                    }
                 }
-                footer
+                .frame(maxWidth: 580, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(16)
+
+            Divider()
+            actionBar
         }
     }
 
+    // MARK: - 头部
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(draft.name.isEmpty ? "未命名端点" : draft.name)
                     .font(.title3.weight(.semibold))
                 if isActive {
-                    Text("使用中")
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.18), in: Capsule())
-                        .foregroundStyle(.green)
+                    StatusBadge(text: "使用中", color: .green)
                 }
             }
             Text(draft.kind.summary)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private var generalSection: some View {
-        GroupBox("基本信息") {
-            VStack(alignment: .leading, spacing: 10) {
-                TextField("名称", text: $draft.name)
-                Picker("服务类型", selection: Binding(
+    // MARK: - 基本信息
+
+    private var generalCard: some View {
+        SettingsCard("基本信息") {
+            SettingsRow("名称") {
+                TextField("例如：公司内网 / 火山豆包", text: $draft.name)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 320)
+            }
+
+            SettingsRow("服务类型") {
+                Picker("", selection: Binding(
                     get: { draft.kind },
                     set: { newKind in
-                        if draft.kind != newKind {
-                            draft.endpointURL = newKind == .openAICompatible
-                                ? "https://api.openai.com/v1/audio/transcriptions"
-                                : "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
-                            draft.kind = newKind
+                        guard draft.kind != newKind else { return }
+                        switch newKind {
+                        case .openAICompatible:
+                            draft.endpointURL = "https://api.openai.com/v1/audio/transcriptions"
+                        case .volcengineStreaming:
+                            draft.endpointURL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
                         }
+                        draft.kind = newKind
+                        localMessage = nil
                     }
                 )) {
-                    ForEach(EndpointProfile.ProviderKind.allCases) { kind in
-                        Text(kind.displayName).tag(kind)
-                    }
+                    Text("OpenAI-compatible").tag(EndpointProfile.ProviderKind.openAICompatible)
+                    Text("火山引擎流式").tag(EndpointProfile.ProviderKind.volcengineStreaming)
                 }
                 .pickerStyle(.segmented)
-
-                TextField("完整 Endpoint URL", text: $draft.endpointURL)
-                    .font(.system(.body, design: .monospaced))
-                Text(endpointKindHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .labelsHidden()
+                .frame(width: 320)
             }
-            .padding(8)
-        }
-    }
 
-    private var endpointKindHint: String {
-        if draft.kind == .openAICompatible {
-            return "HTTPS；本机 loopback 可在下方明确允许 HTTP。Voxi 不会替换你填写的路径。"
+            SettingsRow(
+                "Endpoint",
+                caption: draft.kind == .openAICompatible
+                    ? "HTTPS；仅本机 loopback 可在下方明确允许 HTTP。Voxi 不会替换你填写的路径。"
+                    : "WebSocket（wss://）。可填写控制台实际开通的兼容地址。"
+            ) {
+                TextField("完整 URL", text: $draft.endpointURL)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+            }
         }
-        return "WebSocket（wss://）。可在控制台开通的兼容地址上修改。"
     }
 
     // MARK: - OpenAI-compatible
 
-    private var openAISection: some View {
-        GroupBox("OpenAI-compatible") {
-            VStack(alignment: .leading, spacing: 10) {
-                TextField("model", text: $draft.openAI.model)
+    private var openAICard: some View {
+        SettingsCard("OpenAI-compatible") {
+            SettingsRow("model", caption: "必填；不同服务的模型名不同。") {
+                TextField("例如 whisper-1 / sensevoice", text: $draft.openAI.model)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 260)
+            }
 
-                Picker("鉴权方式", selection: $draft.openAI.authMode) {
+            SettingsRow("鉴权方式") {
+                Picker("", selection: $draft.openAI.authMode) {
                     ForEach(EndpointProfile.OpenAIOptions.AuthMode.allCases) { mode in
                         Text(mode.displayName).tag(mode)
                     }
                 }
+                .labelsHidden()
+                .frame(width: 260)
+            }
 
-                if draft.openAI.authMode == .customHeader {
-                    TextField("鉴权 header 名称（例如 api-key）", text: $draft.openAI.customAuthHeaderName)
+            if draft.openAI.authMode == .customHeader {
+                SettingsRow("Header 名") {
+                    TextField("例如 api-key", text: $draft.openAI.customAuthHeaderName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 260)
                 }
+            }
 
-                secureField(
-                    title: "API Key",
-                    existingID: draft.apiKeyItemID,
+            SettingsRow("API Key", caption: "保存到 Keychain；界面不回显已保存的密钥。更新后首次读取可能需要在系统对话框中选择“始终允许”。") {
+                secretInput(
                     text: $apiKeyInput,
-                    placeholder: draft.apiKeyItemID == nil ? "填写后保存到 Keychain" : "已保存（留空表示不修改）"
+                    hasExisting: draft.apiKeyItemID != nil
                 )
+            }
 
-                Picker("响应格式", selection: $draft.openAI.responseFormat) {
+            SettingsRow("响应格式") {
+                Picker("", selection: $draft.openAI.responseFormat) {
                     ForEach(EndpointProfile.OpenAIOptions.ResponseFormat.allCases) { format in
                         Text(format.displayName).tag(format)
                     }
                 }
-                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                .frame(width: 260)
+            }
 
-                HStack {
-                    Text("超时（秒）")
+            SettingsRow("超时") {
+                HStack(spacing: 6) {
                     TextField("60", value: $draft.openAI.timeoutSeconds, format: .number)
+                        .textFieldStyle(.roundedBorder)
                         .frame(width: 80)
-                }
-
-                Toggle("发送 language 字段", isOn: $draft.openAI.sendsLanguageField)
-                Toggle("发送 prompt 字段", isOn: $draft.openAI.sendsPromptField)
-                if draft.isLoopbackEndpoint {
-                    Toggle("允许对本机地址使用明文 HTTP", isOn: $draft.openAI.allowsInsecureLocalHTTP)
+                    Text("秒").foregroundStyle(.secondary)
                 }
             }
-            .padding(8)
+
+            Divider()
+
+            Toggle("发送 language 字段", isOn: $draft.openAI.sendsLanguageField)
+            Toggle("发送 prompt 字段", isOn: $draft.openAI.sendsPromptField)
+
+            if draft.isLoopbackEndpoint {
+                Toggle("允许对本机地址使用明文 HTTP", isOn: $draft.openAI.allowsInsecureLocalHTTP)
+            }
         }
     }
 
-    private var customFieldsSection: some View {
-        GroupBox("自定义 headers / 表单字段") {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("自定义字段按顺序追加。不能覆盖 file / model / language / prompt / response_format / Content-Type / Authorization。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                httpFieldsEditor(title: "Headers", fields: $draft.openAI.customHeaders)
-                httpFieldsEditor(title: "Form fields", fields: $draft.openAI.customFormFields)
-            }
-            .padding(8)
+    private var customFieldsCard: some View {
+        SettingsCard(
+            "自定义 headers / 表单字段",
+            footer: "不能覆盖 file / model / language / prompt / response_format / Content-Type / Authorization。"
+        ) {
+            httpFieldsEditor(title: "Headers", fields: $draft.openAI.customHeaders)
+            Divider()
+            httpFieldsEditor(title: "Form fields", fields: $draft.openAI.customFormFields)
         }
     }
 
@@ -312,9 +377,10 @@ struct EndpointEditorView: View {
         title: String,
         fields: Binding<[EndpointProfile.HTTPField]>
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(title).font(.callout.weight(.medium))
+                Text(title)
+                    .font(.callout.weight(.medium))
                 Spacer()
                 Button {
                     fields.wrappedValue.append(.init(name: "", value: .literal("")))
@@ -322,21 +388,32 @@ struct EndpointEditorView: View {
                     Image(systemName: "plus.circle")
                 }
                 .buttonStyle(.borderless)
+                .help("添加\(title == "Headers" ? " header" : "字段")")
             }
+
+            if fields.wrappedValue.isEmpty {
+                Text("暂无自定义\(title == "Headers" ? " header" : "字段")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             ForEach(fields) { $field in
                 HStack(spacing: 6) {
                     TextField("名称", text: $field.name)
-                        .frame(width: 130)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 128)
                     if field.isSecret {
                         SecureField(
-                            secretFieldInputs[field.id] != nil ? secretFieldInputs[field.id]! : "已保存（可留空）",
+                            secretFieldInputs[field.id] == nil ? "已保存（可留空）" : "",
                             text: Binding(
                                 get: { secretFieldInputs[field.id] ?? "" },
                                 set: { secretFieldInputs[field.id] = $0 }
                             )
                         )
+                        .textFieldStyle(.roundedBorder)
                     } else {
                         TextField("值", text: literalBinding(for: field))
+                            .textFieldStyle(.roundedBorder)
                     }
                     Toggle("secret", isOn: Binding(
                         get: { field.isSecret },
@@ -351,6 +428,124 @@ struct EndpointEditorView: View {
                     }
                     .buttonStyle(.borderless)
                 }
+            }
+        }
+    }
+
+    // MARK: - 火山
+
+    private var volcengineCard: some View {
+        SettingsCard("火山引擎豆包流式识别") {
+            SettingsRow(
+                "鉴权模式",
+                caption: "新版与旧版凭据不能混用。"
+            ) {
+                Picker("", selection: $draft.volcengine.authMode) {
+                    ForEach(EndpointProfile.VolcengineOptions.AuthMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 300)
+            }
+
+            switch draft.volcengine.authMode {
+            case .apiKey:
+                SettingsRow("API Key", caption: "保存到 Keychain；界面不回显已保存的密钥。更新后首次读取可能需要在系统对话框中选择“始终允许”。") {
+                    secretInput(text: $apiKeyInput, hasExisting: draft.apiKeyItemID != nil)
+                }
+            case .legacy:
+                SettingsRow("App Key") {
+                    secretInput(text: $appKeyInput, hasExisting: draft.appKeyItemID != nil)
+                }
+                SettingsRow("Access Key") {
+                    secretInput(text: $accessKeyInput, hasExisting: draft.accessKeyItemID != nil)
+                }
+            }
+
+            SettingsRow("Resource ID", caption: "与账号已开通的资源一致，例如 volc.seedasr.sauc.duration。") {
+                TextField("volc.seedasr.sauc.duration", text: $draft.volcengine.resourceID)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+            }
+
+            SettingsRow("model_name") {
+                TextField("bigmodel", text: $draft.volcengine.modelName)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+            }
+
+            SettingsRow("结果类型") {
+                Picker("", selection: $draft.volcengine.resultType) {
+                    ForEach(EndpointProfile.VolcengineOptions.ResultType.allCases) { type in
+                        Text(type.displayName).tag(type)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 220)
+            }
+
+            Toggle("发送 X-Api-Sequence header（按所选 v3 接口要求）", isOn: $draft.volcengine.sendsApiSequenceHeader)
+        }
+    }
+
+    // MARK: - 底部操作栏
+
+    private var actionBar: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Group {
+                if let message = localMessage {
+                    Text(message).foregroundStyle(.orange)
+                } else if let saveMessage {
+                    Text(saveMessage).foregroundStyle(.secondary)
+                } else if let validation = draft.validation().message {
+                    Text(validation).foregroundStyle(.orange)
+                } else if !draft.isLoopbackEndpoint && draft.kind == .openAICompatible {
+                    Text("配置有效").foregroundStyle(.secondary)
+                } else {
+                    Text("")
+                }
+            }
+            .font(.caption)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+
+            Button("测试端点…") {
+                saveDraft()
+                if draft.validation().isValid {
+                    onTest()
+                }
+            }
+            .disabled(!draft.validation().isValid)
+
+            Button("保存") {
+                saveDraft()
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut("s", modifiers: .command)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    // MARK: - 控件
+
+    private func secretInput(text: Binding<String>, hasExisting: Bool) -> some View {
+        HStack(spacing: 6) {
+            SecureField(
+                hasExisting ? "已保存（留空表示不修改）" : "填写后保存到 Keychain",
+                text: text
+            )
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 340)
+            if hasExisting {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(.secondary)
+                    .help("已保存在 Keychain")
             }
         }
     }
@@ -370,93 +565,6 @@ struct EndpointEditorView: View {
             }
         )
     }
-
-    // MARK: - 火山
-
-    private var volcengineSection: some View {
-        GroupBox("火山引擎豆包流式识别") {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("鉴权模式", selection: $draft.volcengine.authMode) {
-                    ForEach(EndpointProfile.VolcengineOptions.AuthMode.allCases) { mode in
-                        Text(mode.displayName).tag(mode)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-
-                switch draft.volcengine.authMode {
-                case .apiKey:
-                    secureField(
-                        title: "API Key",
-                        existingID: draft.apiKeyItemID,
-                        text: $apiKeyInput,
-                        placeholder: draft.apiKeyItemID == nil ? "填写后保存到 Keychain" : "已保存（留空表示不修改）"
-                    )
-                case .legacy:
-                    secureField(
-                        title: "App Key",
-                        existingID: draft.appKeyItemID,
-                        text: $appKeyInput,
-                        placeholder: draft.appKeyItemID == nil ? "填写后保存到 Keychain" : "已保存（留空表示不修改）"
-                    )
-                    secureField(
-                        title: "Access Key",
-                        existingID: draft.accessKeyItemID,
-                        text: $accessKeyInput,
-                        placeholder: draft.accessKeyItemID == nil ? "填写后保存到 Keychain" : "已保存（留空表示不修改）"
-                    )
-                }
-
-                TextField("Resource ID", text: $draft.volcengine.resourceID)
-                TextField("model_name", text: $draft.volcengine.modelName)
-
-                Picker("结果类型", selection: $draft.volcengine.resultType) {
-                    ForEach(EndpointProfile.VolcengineOptions.ResultType.allCases) { type in
-                        Text(type.displayName).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Toggle("发送 X-Api-Sequence header", isOn: $draft.volcengine.sendsApiSequenceHeader)
-            }
-            .padding(8)
-        }
-    }
-
-    // MARK: - 底部
-
-    private var footer: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let message = localMessage ?? saveMessage {
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(localMessage == nil ? Color.secondary : Color.orange)
-            }
-            if let validation = draft.validation().message {
-                Text(validation)
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
-            HStack {
-                Button("保存") { saveDraft() }
-                    .keyboardShortcut("s", modifiers: .command)
-                Button("测试端点…") {
-                    saveDraft()
-                    if draft.validation().isValid {
-                        onTest()
-                    }
-                }
-                .disabled(!draft.validation().isValid)
-                Spacer()
-                if let profile = settingsActiveHint {
-                    Text(profile)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    private var settingsActiveHint: String? { nil }
 
     // MARK: - 保存
 
@@ -492,21 +600,12 @@ struct EndpointEditorView: View {
     }
 
     private func saveCustomFieldSecrets(_ profile: inout EndpointProfile) throws {
-        profile.openAI.customHeaders = try profile.openAI.customHeaders.map { field in
-            try resolve(field)
-        }
-        profile.openAI.customFormFields = try profile.openAI.customFormFields.map { field in
-            try resolve(field)
-        }
+        profile.openAI.customHeaders = try profile.openAI.customHeaders.map { try resolve($0) }
+        profile.openAI.customFormFields = try profile.openAI.customFormFields.map { try resolve($0) }
     }
 
     private func resolve(_ field: EndpointProfile.HTTPField) throws -> EndpointProfile.HTTPField {
-        guard field.isSecret else {
-            if case .keychain = field.value {
-                return field
-            }
-            return field
-        }
+        guard field.isSecret else { return field }
         let input = secretFieldInputs[field.id] ?? ""
         var updated = field
         if !input.isEmpty {
@@ -521,24 +620,5 @@ struct EndpointEditorView: View {
     private func fieldID(for field: EndpointProfile.HTTPField) -> UUID? {
         if case .keychain(let id) = field.value { return id }
         return nil
-    }
-
-    private func secureField(
-        title: String,
-        existingID: UUID?,
-        text: Binding<String>,
-        placeholder: String
-    ) -> some View {
-        HStack {
-            Text(title)
-                .frame(width: 90, alignment: .leading)
-            SecureField(placeholder, text: text)
-                .textFieldStyle(.roundedBorder)
-            if existingID != nil {
-                Image(systemName: "lock.fill")
-                    .foregroundStyle(.secondary)
-                    .help("已保存在 Keychain")
-            }
-        }
     }
 }

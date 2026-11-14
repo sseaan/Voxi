@@ -16,6 +16,7 @@ final class EndpointTestModel: ObservableObject {
     }
 
     @Published private(set) var phase: Phase = .idle
+    @Published private(set) var interimText = ""
     private let profile: EndpointProfile
     private let capture = AudioCaptureService()
     private var recordingURL: URL?
@@ -59,14 +60,14 @@ final class EndpointTestModel: ObservableObject {
     func send() async {
         guard let recordingURL, canSend else { return }
         phase = .sending
+        interimText = ""
         do {
             let provider: TranscriptionProvider
             switch profile.kind {
             case .openAICompatible:
                 provider = OpenAICompatibleProvider()
             case .volcengineStreaming:
-                phase = .failure("火山引擎流式端点的测试将在流式协议接入后提供。请先用一次真实录音验证。")
-                return
+                provider = VolcengineStreamingProvider()
             }
             let session = try await provider.makeSession(
                 profile: profile,
@@ -76,11 +77,52 @@ final class EndpointTestModel: ObservableObject {
                     audioDuration: durationSeconds
                 )
             )
+
+            let updatesTask = Task { [weak self] in
+                for try await update in session.updates {
+                    guard let self else { return }
+                    if case .interim(let text) = update {
+                        self.interimText = text
+                    }
+                }
+            }
+
+            if profile.kind == .volcengineStreaming {
+                // 把测试录音按 200ms 分片模拟实时流，验证真实流式链路。
+                let pcm = try Self.pcmFromWAV(recordingURL)
+                var offset = 0
+                while offset < pcm.count {
+                    let end = min(offset + 6_400, pcm.count)
+                    try await session.appendAudio(pcm.subdata(in: offset..<end))
+                    offset = end
+                    try await Task.sleep(nanoseconds: 150_000_000)
+                }
+            }
+
             let result = try await session.finish(recordingURL: recordingURL)
+            updatesTask.cancel()
+            interimText = ""
             phase = .success(result.text)
         } catch {
+            interimText = ""
             phase = .failure(error.localizedDescription)
         }
+    }
+
+    static func pcmFromWAV(_ url: URL) throws -> Data {
+        let data = try Data(contentsOf: url)
+        guard data.count > 44 else { throw TranscriptionError.audioFileUnreadable }
+        var offset = 12
+        while offset + 8 <= data.count {
+            let identifier = data[offset..<offset + 4]
+            let sizeBytes = data[offset + 4..<offset + 8]
+            let size = Int(sizeBytes.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) }.littleEndian)
+            if identifier == Data("data".utf8) {
+                return data.subdata(in: (offset + 8)..<min(offset + 8 + size, data.count))
+            }
+            offset += 8 + size + (size % 2)
+        }
+        throw TranscriptionError.audioFileUnreadable
     }
 
     func reset() {
@@ -174,9 +216,17 @@ struct EndpointTestView: View {
                 }
             }
         case .sending:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("正在上传并等待识别结果…")
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("正在发送并等待识别结果…")
+                }
+                if !model.interimText.isEmpty {
+                    Text(model.interimText)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                }
             }
         case .success(let text):
             VStack(alignment: .leading, spacing: 6) {

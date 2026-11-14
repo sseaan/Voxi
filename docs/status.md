@@ -29,7 +29,7 @@
 | 4.2 | 协调器状态机 | 火山 connecting 状态；迟到结果丢弃；取消与 final 竞争；PID 锁定逻辑测试 |
 | 4.3 | 自动输入 | TextEdit 实测辅助功能插入成功；浏览器输入框实测剪贴板粘贴回退并恢复剪贴板；安全输入框/终端/权限缺失/前台切换有测试 |
 | 5.1 | Release 自签名构建 | `dist/Voxi.app` codesign 有效；`spctl` 本机 accepted（因本机信任该证书） |
-| 5.2 | 打包与首次启动 | `dist/Voxi.zip` + `README-FIRST-LAUNCH.txt` + `manifest.txt`；用户已在 Gatekeeper 弹窗中手动“打开”，App 随后正常运行 |
+| 5.2 | 打包与首次启动 | `dist/Voxi.zip` + `README-FIRST-LAUNCH.txt` + `manifest.txt`；用户在干净环境完成 Gatekeeper 首次启动，无问题 |
 
 自动化测试：`xcodebuild test ...` 共 **148 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
 
@@ -37,32 +37,31 @@
 
 1. **火山序号校验**：服务端返回 `autoAssignedSequence (2) mismatch sequence in request (1)`。
    初始化帧改为带正序号 1，音频包从 2 开始。
-2. **MenuBarExtra 反复开合后失灵**：macOS 26/27 上 SwiftUI `MenuBarExtra` 多次打开后不再响应。
-   已替换为 AppKit `NSStatusItem + NSPopover`（`StatusItemController`），连续开合验证正常。
-3. **CoreAudio 设备切换阻塞主线程**：音频引擎启动/收尾移到后台并加 10s 超时。
-4. **设置数据被误清空**（本次开发操作失误）：已重新配置并验证重启后仍保留；
-   两套凭据均保存在 Keychain，profile 引用持久化。
+2. **菜单栏面板错位**：实测图标中心 914.25，NSPopover 内容中心 924（右偏约 10pt）。
+   已在展示后按图标中心校正面板位置，靠近屏幕边缘时不做校正。
+3. **MenuBarExtra 反复开合后失灵**：已改为 AppKit `NSStatusItem + NSPopover`。
+4. **设置页排版与保存反馈**：
+   - 统一为「顶部标签 + 居中内容 + 底部保存栏」结构，卡片式分组、标签列对齐；
+   - 通用与文本页使用草稿模型，底部提供「保存 / 还原」与「已保存 HH:mm:ss」反馈；
+   - 端点页固定底部操作栏，保存后显示「已保存并设为当前端点 · 时间」；
+   - 设置窗口默认尺寸调整为 760×620。
+5. **端点测试**：火山流式端点现在也会按 200ms 分片发送测试录音，并显示中间结果。
+6. **CoreAudio 设备切换阻塞主线程**：音频引擎启动/收尾移到后台并加 10s 超时。
+7. **Keychain 在更新构建后可能要求重新授权**：用户需在弹出的系统对话框输入登录密码并选择
+   「始终允许」一次；错误提示已说明该操作。
 
-## 早上继续的待测清单
+## 上午实测结果（用户反馈）
 
-按优先级：
+- 干净环境 Gatekeeper 首次启动：已完成，无问题。
+- 多 App 输入兼容：已确认无需额外测试。
+- 本轮 UI 修订后，等待用户实际点击验证面板位置与设置页反馈。
 
-1. **干净环境首次启动（Phase 5.2.4）**
-   - 在未安装 `Voxi Self-Signed Code Signing` 证书的独立 macOS 用户或测试机上，
-     下载 `dist/Voxi.zip`，按 `README-FIRST-LAUNCH.txt` 完成 Gatekeeper 首次启动。
-   - 验证麦克风、辅助功能授权在“安装新版本”后是否保留。
-2. **多 App 输入兼容性（Phase 4.3 手工清单）**
-   - Notes、Safari/Chrome 网页输入框、Slack（Electron）、VS Code。
-   - 记录哪些控件走辅助功能、哪些走剪贴板、哪些只能手动复制。
-3. **异常路径手工回归**
-   - 错误火山 API Key / 错误 Resource ID / 断网 / 服务超时。
-   - 识别中切换前台应用；按住模式权限弹窗期间松键；切换录音模式后重复触发。
-4. **长录音与稳定性**
-   - 火山 30s+ 连续说话：确认中间结果只更新预览、最终文本唯一、无 45000081 超时。
-   - OpenAI 端点大文件上传与 60s 超时行为。
-5. **发布复核**
-   - 重新生成 `dist` 后核对 `manifest.txt` 的 SHA-256 与证书指纹。
-   - 确认 `dist/Voxi.zip` 与当前源码一致（本次已重新打包）。
+## 仍需手工回归
+
+1. 错误路径：错误火山 API Key / Resource ID、断网、服务超时。
+2. 识别中切换前台应用；按住模式权限弹窗期间松键；切换录音模式后重复触发。
+3. 长录音：火山 30s+ 与 SenseVoice 大文件（79.8s 测试录音已生成，待确认最终结果）。
+4. 更新构建后 Keychain「始终允许」流程与 TCC 权限保留。
 
 ## 常用命令
 
