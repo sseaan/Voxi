@@ -549,6 +549,14 @@ final class AppCoordinator: ObservableObject {
                     styleNotice = "风格处理失败，已使用原文：\(error.localizedDescription)"
                 }
             }
+            if !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                // 只记录计数与时长，不保存转写文本。
+                settings.settings.usage.record(
+                    duration: metadata.duration,
+                    text: finalText
+                )
+            }
+
             var storedResult = result
             storedResult.text = finalText
             appState.setLastResult(storedResult)

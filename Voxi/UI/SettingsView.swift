@@ -6,7 +6,7 @@ struct SettingsView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var coordinator: AppCoordinator
 
-    @State private var tab: SettingsTab = .general
+    @State private var tab: SettingsTab = .dashboard
     @State private var onboardingController: OnboardingWindowController?
 
     init(settings: SettingsStore, appState: AppState, coordinator: AppCoordinator) {
@@ -74,6 +74,12 @@ struct SettingsView: View {
     @ViewBuilder
     private var content: some View {
         switch tab {
+        case .dashboard:
+            DashboardView(
+                settings: settings,
+                onRunOnboarding: runOnboarding,
+                onOpenTab: { tab = $0 }
+            )
         case .general:
             GeneralSettingsView(settings: settings, permissions: coordinator.permissions)
         case .endpoints:
@@ -83,18 +89,19 @@ struct SettingsView: View {
         case .lexicon:
             LexiconView(settings: settings)
         case .about:
-            AboutSettingsView {
-                settings.settings.hasCompletedOnboarding = false
-                let controller = OnboardingWindowController(
-                    settings: settings,
-                    coordinator: coordinator
-                )
-                onboardingController = controller
-                controller.show()
-            }
+            AboutSettingsView(onRunOnboarding: runOnboarding)
         }
     }
 
+    private func runOnboarding() {
+        settings.settings.hasCompletedOnboarding = false
+        let controller = OnboardingWindowController(
+            settings: settings,
+            coordinator: coordinator
+        )
+        onboardingController = controller
+        controller.show()
+    }
 }
 
 struct GeneralSettingsView: View {

@@ -19,6 +19,7 @@ struct VoxiSettings: Codable, Equatable {
     var languageModel: LanguageModelProfile?
     /// 首次引导是否完成。旧配置没有这个字段时按已完成处理，避免升级后强制引导。
     var hasCompletedOnboarding: Bool
+    var usage: UsageStats
 
     static let currentSchemaVersion = 1
 
@@ -35,7 +36,8 @@ struct VoxiSettings: Codable, Equatable {
         selectedStyleID: UUID? = nil,
         customStyles: [TranscriptionStyle] = [],
         languageModel: LanguageModelProfile? = nil,
-        hasCompletedOnboarding: Bool = false
+        hasCompletedOnboarding: Bool = false,
+        usage: UsageStats = UsageStats()
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
@@ -50,6 +52,7 @@ struct VoxiSettings: Codable, Equatable {
         self.customStyles = customStyles
         self.languageModel = languageModel
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.usage = usage
     }
 
     /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
@@ -75,7 +78,7 @@ struct VoxiSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
              textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon,
-             selectedStyleID, customStyles, languageModel, hasCompletedOnboarding
+             selectedStyleID, customStyles, languageModel, hasCompletedOnboarding, usage
     }
 
     /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
@@ -104,6 +107,7 @@ struct VoxiSettings: Codable, Equatable {
             Bool.self,
             forKey: .hasCompletedOnboarding
         ) ?? true
+        usage = try container.decodeIfPresent(UsageStats.self, forKey: .usage) ?? UsageStats()
     }
 
     func encode(to encoder: Encoder) throws {
@@ -121,6 +125,7 @@ struct VoxiSettings: Codable, Equatable {
         try container.encode(customStyles, forKey: .customStyles)
         try container.encodeIfPresent(languageModel, forKey: .languageModel)
         try container.encode(hasCompletedOnboarding, forKey: .hasCompletedOnboarding)
+        try container.encode(usage, forKey: .usage)
     }
 }
 

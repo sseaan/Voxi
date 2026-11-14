@@ -841,4 +841,20 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(state.lastResult?.text, "第二个模型结果")
         XCTAssertEqual(provider.requestedModels, ["m1", "m2"])
     }
+
+    func testSuccessfulRecordingRecordsUsageWithoutTranscript() async {
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "你好世界"
+        let (coordinator, store, state, _) = makeCoordinator(provider: provider)
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle }
+
+        XCTAssertEqual(store.settings.usage.totalSessions, 1)
+        XCTAssertEqual(store.settings.usage.totalCharacters, 4)
+        XCTAssertEqual(store.settings.usage.totalSeconds, 1.2, accuracy: 0.01)
+        XCTAssertNil(store.settings.usage.daily.values.first { $0.characters == 0 })
+    }
 }

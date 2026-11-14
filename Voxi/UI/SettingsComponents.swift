@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum SettingsTab: String, CaseIterable, Identifiable {
+    case dashboard
     case general
     case endpoints
     case text
@@ -12,6 +13,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
+        case .dashboard: return "看板"
         case .general: return "通用"
         case .endpoints: return "模型"
         case .text: return "风格"
@@ -22,6 +24,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
+        case .dashboard: return "rectangle.grid.2x2.fill"
         case .general: return "gearshape.fill"
         case .endpoints: return "square.stack.3d.up.fill"
         case .text: return "wand.and.stars"
@@ -32,6 +35,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
+        case .dashboard: return Color(red: 0.18, green: 0.55, blue: 0.95)
         case .general: return Color(red: 0.42, green: 0.48, blue: 0.56)
         case .endpoints: return Color(red: 0.33, green: 0.47, blue: 0.92)
         case .text: return Color(red: 0.64, green: 0.42, blue: 0.94)

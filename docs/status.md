@@ -31,7 +31,7 @@
 | 5.1 | Release 自签名构建 | `dist/Voxi.app` codesign 有效；`spctl` 本机 accepted（因本机信任该证书） |
 | 5.2 | 打包与首次启动 | `dist/Voxi.zip` + `README-FIRST-LAUNCH.txt` + `manifest.txt`；用户在干净环境完成 Gatekeeper 首次启动，无问题 |
 
-自动化测试：`xcodebuild test ...` 共 **195 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
+自动化测试：`xcodebuild test ...` 共 **202 项**（2 项真实服务集成测试默认跳过，避免误用凭据），其余全部通过。
 
 ## 本轮修复的问题
 
@@ -315,3 +315,11 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   4. 启动与输出：登录时启动、录音方式、自动输入、菜单栏临时文本、保留标点。
 - 登录时启动使用 `SMAppService`；通用设置也新增同一开关。
 - 首启标记 `hasCompletedOnboarding`：新安装默认 false；旧配置没有该字段时按 true 处理，升级用户不会被强制引导。
+
+## 第十四轮：看板、发布工作流与 README（2026-11-15）
+
+- 设置新增「看板」并作为默认首页：口述时间/字数/次数/平均速度、近 7 天每日字数折线图、模型链与词库概览；支持全部/今天/近 7 天筛选。
+- 新增 `UsageStats`：只记录计数与每日字数，不保存转写文本；文件转写不计入口述看板。
+- 新增 `.github/workflows/release.yml`：推送 `v*` tag 或手动指定 tag，构建 universal Release（ad-hoc 签名），生成 zip/manifest 并上传 GitHub Release。
+- 新增 `packaging/README-FIRST-LAUNCH.txt` 发布包说明模板。
+- README 按项目类型重写，补充安装、权限、隐私、构建与架构说明。

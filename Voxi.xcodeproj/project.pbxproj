@@ -30,6 +30,8 @@
 		449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */; };
 		46245518D89E9D915E0C4CF7 /* AudioConversionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48541423C4189BA56AEAC747 /* AudioConversionTests.swift */; };
 		4AFE686CE17E333663CB23DC /* VolcengineStreamingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66D5C6564A6E04404D91491 /* VolcengineStreamingProvider.swift */; };
+		50622CC241D7490714B7CE62 /* UsageStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDFC5800101D908E48AF4DD9 /* UsageStats.swift */; };
+		50C52052F9E9EAD5E0CFD2AE /* UsageStatsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED9F936FD2BCECC672A2977 /* UsageStatsTests.swift */; };
 		5AE7C622229FB726E62A279D /* RealServiceIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CDBE6E17294DFD97106C0C7 /* RealServiceIntegrationTests.swift */; };
 		5E4076B470239E4DED6A0C3A /* TranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */; };
 		6477B3F8392989848DA658A4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 887ADCAFE62F37B22776D369 /* Assets.xcassets */; };
@@ -50,6 +52,7 @@
 		AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */; };
 		AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */; };
 		B03E02AA4D0D0A13474F5C22 /* EndpointTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */; };
+		B4A0AD1C11FAC34BA512DD66 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF2F8A3C02B9366944E6CBCE /* DashboardView.swift */; };
 		BF6BF08F53F9F0E74DEFAB92 /* ShortcutService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */; };
 		C61058F545723555D70CA168 /* VolcengineWebSocketCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 753BE72EC2BAE04088D177C4 /* VolcengineWebSocketCodec.swift */; };
 		CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */; };
@@ -139,11 +142,14 @@
 		BB195D70CDF8A2097B728806 /* StyleAndChatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleAndChatTests.swift; sourceTree = "<group>"; };
 		BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointProfile.swift; sourceTree = "<group>"; };
 		BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndpointEditorView.swift; sourceTree = "<group>"; };
+		BF2F8A3C02B9366944E6CBCE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		C3E0A566E2DC68EFC2F1A413 /* LexiconView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LexiconView.swift; sourceTree = "<group>"; };
 		C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
+		CED9F936FD2BCECC672A2977 /* UsageStatsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStatsTests.swift; sourceTree = "<group>"; };
 		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileTranscriptionView.swift; sourceTree = "<group>"; };
 		DADD2FC03603CD6B52917ED3 /* ASRModelCandidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRModelCandidate.swift; sourceTree = "<group>"; };
+		DDFC5800101D908E48AF4DD9 /* UsageStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStats.swift; sourceTree = "<group>"; };
 		E1D36565ECDB1D74960D92BE /* TextInsertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionService.swift; sourceTree = "<group>"; };
 		E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProvider.swift; sourceTree = "<group>"; };
 		EBC1B11E5EC2F1A4A06725F8 /* Voxi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Voxi-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -168,6 +174,7 @@
 				4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */,
 				1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */,
 				AB86C98F48A71BE267A2BC27 /* TranscriptionStyle.swift */,
+				DDFC5800101D908E48AF4DD9 /* UsageStats.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -198,6 +205,7 @@
 			isa = PBXGroup;
 			children = (
 				D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */,
+				BF2F8A3C02B9366944E6CBCE /* DashboardView.swift */,
 				BDCC7975AF4E2ADF9CC9736B /* EndpointEditorView.swift */,
 				6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */,
 				C3E0A566E2DC68EFC2F1A413 /* LexiconView.swift */,
@@ -285,6 +293,7 @@
 				B46C12AF174A31C7E59B1450 /* ShortcutServiceTests.swift */,
 				BB195D70CDF8A2097B728806 /* StyleAndChatTests.swift */,
 				B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */,
+				CED9F936FD2BCECC672A2977 /* UsageStatsTests.swift */,
 				4E3F65CF1924B612B1715A7E /* VolcengineStreamingProviderTests.swift */,
 				B8B87F00B5189CFE5F74C207 /* VolcengineWebSocketCodecTests.swift */,
 			);
@@ -402,6 +411,7 @@
 				8A2B48A3679448FF868F2BD2 /* AudioFileConverter.swift in Sources */,
 				20CF732A0C98159EBD64099F /* AudioFileTranscriptionView.swift in Sources */,
 				8A3B8B9F6E277BD0E59C09BA /* ChatCompletionService.swift in Sources */,
+				B4A0AD1C11FAC34BA512DD66 /* DashboardView.swift in Sources */,
 				04496559C79CE3C6842F056A /* EndpointEditorView.swift in Sources */,
 				149277C3EFA76F001653D154 /* EndpointProfile.swift in Sources */,
 				B03E02AA4D0D0A13474F5C22 /* EndpointTestView.swift in Sources */,
@@ -439,6 +449,7 @@
 				5E4076B470239E4DED6A0C3A /* TranscriptionProvider.swift in Sources */,
 				33A307DFF15B4726516F5E6C /* TranscriptionResult.swift in Sources */,
 				210AA12F42B9BC41ACEDBC6A /* TranscriptionStyle.swift in Sources */,
+				50622CC241D7490714B7CE62 /* UsageStats.swift in Sources */,
 				4AFE686CE17E333663CB23DC /* VolcengineStreamingProvider.swift in Sources */,
 				C61058F545723555D70CA168 /* VolcengineWebSocketCodec.swift in Sources */,
 				F8BB4C9F6E94BCD4F502AAC3 /* VolcengineWebSocketTransport.swift in Sources */,
@@ -463,6 +474,7 @@
 				449EE74CED3D296CDF19B3BF /* ShortcutServiceTests.swift in Sources */,
 				EC611CB10407BDCC5B705620 /* StyleAndChatTests.swift in Sources */,
 				AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */,
+				50C52052F9E9EAD5E0CFD2AE /* UsageStatsTests.swift in Sources */,
 				776BDDF3225B0A1F31C770D4 /* VolcengineStreamingProviderTests.swift in Sources */,
 				F4B869267B5F8CF39757934C /* VolcengineWebSocketCodecTests.swift in Sources */,
 			);

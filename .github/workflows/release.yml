@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build, e.g. v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build macOS app
+    runs-on: macos-15
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag and version
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+            git rev-parse "refs/tags/${TAG}" >/dev/null
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Building ${TAG} (${VERSION})"
+
+      - name: Select newest Xcode
+        run: |
+          XCODE="$(find /Applications -maxdepth 1 -name 'Xcode*.app' | sort -V | tail -1)"
+          if [ -n "$XCODE" ]; then
+            sudo xcode-select -s "$XCODE"
+          fi
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcode-select -p
+          sw_vers
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build universal Release (ad-hoc signed)
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project Voxi.xcodeproj \
+            -scheme Voxi \
+            -configuration Release \
+            -derivedDataPath build/DerivedData-release \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            MARKETING_VERSION="${VERSION}" \
+            CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}"
+
+      - name: Verify and package
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          APP="build/DerivedData-release/Build/Products/Release/Voxi.app"
+          test -d "$APP"
+          lipo -info "$APP/Contents/MacOS/Voxi"
+          codesign --verify --deep --strict "$APP"
+          codesign -dv --verbose=4 "$APP" 2>&1 | sed -n '1,20p'
+
+          rm -rf dist
+          mkdir -p dist/Voxi-package
+          ditto "$APP" dist/Voxi.app
+          ditto "$APP" dist/Voxi-package/Voxi.app
+          cp packaging/README-FIRST-LAUNCH.txt dist/Voxi-package/README-FIRST-LAUNCH.txt
+          ditto -c -k --sequesterRsrc --keepParent dist/Voxi-package dist/Voxi.zip
+
+          ZIP_SHA="$(shasum -a 256 dist/Voxi.zip | awk '{print $1}')"
+          APP_SHA="$(shasum -a 256 dist/Voxi.app/Contents/MacOS/Voxi | awk '{print $1}')"
+          cat > dist/manifest.txt <<MANIFEST
+          Voxi GitHub Release
+          生成时间: $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          版本: ${VERSION}
+          Tag: ${TAG}
+          Bundle ID: com.voxi.app
+          签名: ad-hoc（SHA-256 见下；未 notarize）
+          最低系统: macOS 13.0
+          架构: universal (arm64 + x86_64)
+
+          制品:
+          - dist/Voxi.zip
+            SHA-256: ${ZIP_SHA}
+          - dist/Voxi.app/Contents/MacOS/Voxi
+            SHA-256: ${APP_SHA}
+
+          说明:
+          - GitHub Actions 使用 ad-hoc 签名，不包含本地自签名证书。
+          - 首次启动可能需要右键“打开”或在系统设置中允许。
+          - 不要关闭整机 Gatekeeper。
+          MANIFEST
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voxi-${{ steps.meta.outputs.tag }}
+          path: |
+            dist/Voxi.zip
+            dist/manifest.txt
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Voxi ${{ steps.meta.outputs.tag }}
+          body: |
+            macOS 菜单栏语音输入工具。
+
+            **安装**：下载 `Voxi.zip`，解压后拖入“应用程序”。本构建使用 ad-hoc 签名、未 notarize，首次启动请右键“打开”，或在 系统设置 → 隐私与安全性 中允许。请先核对 `manifest.txt` 中的 SHA-256。
+
+            **首次配置**：启动后按引导授予麦克风/辅助功能、选择快捷键、配置语音识别模型；也可以暂时跳过，稍后在设置中完成。
+
+            **隐私**：密钥只保存在 Keychain；不保存录音或转写历史；音频发送到你自己配置的 ASR 端点，选择风格时文本发送到你自己配置的语言模型端点。
+
+            详细变更见仓库的 `docs/status.md`。
+          files: |
+            dist/Voxi.zip
+            dist/manifest.txt
+          generate_release_notes: false
+          fail_on_unmatched_files: true
+          make_latest: true
