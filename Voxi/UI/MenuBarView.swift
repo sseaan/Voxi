@@ -78,11 +78,11 @@ struct MenuBarView: View {
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
             }
-        } else if let profile = settings.activeProfile {
-            let count = settings.settings.profiles.count
+        } else if let first = settings.settings.asrCandidates.first {
+            let count = settings.settings.asrCandidates.count
             Text(count > 1
-                 ? "\(profile.name) · 自动回退 \(count) 个模型"
-                 : "\(profile.name) · \(profile.kind == .openAICompatible ? "停止后上传" : "实时流式")")
+                 ? "\(first.model) · 自动回退 \(count) 个模型"
+                 : "\(first.sourceName) · \(first.model)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

@@ -131,6 +131,7 @@ final class SequencedTranscriptionProvider: TranscriptionProvider {
     let kind: EndpointProfile.ProviderKind = .openAICompatible
     private var sessions: [FakeTranscriptionSession]
     private(set) var makeSessionCallCount = 0
+    private(set) var requestedModels: [String] = []
 
     init(sessions: [FakeTranscriptionSession]) {
         self.sessions = sessions
@@ -138,6 +139,7 @@ final class SequencedTranscriptionProvider: TranscriptionProvider {
 
     func makeSession(profile: EndpointProfile, options: TranscriptionOptions) async throws -> any TranscriptionSession {
         makeSessionCallCount += 1
+        requestedModels.append(profile.openAI.model)
         guard !sessions.isEmpty else { throw TranscriptionError.network("没有更多会话") }
         return sessions.removeFirst()
     }
@@ -802,5 +804,41 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertEqual(state.state, .idle)
         XCTAssertEqual(state.lastResult?.text, "原始文本")
         XCTAssertTrue(state.noticeMessage?.contains("风格处理失败") ?? false)
+    }
+
+    func testFallsBackAcrossModelsWithinSameProfile() async {
+        let failing = FakeTranscriptionSession()
+        failing.finishError = TranscriptionError.serverError(status: 500, detail: "boom")
+        let backup = FakeTranscriptionSession(resultText: "第二个模型结果")
+        let provider = SequencedTranscriptionProvider(sessions: [failing, backup])
+
+        let suite = "test.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let store = SettingsStore(userDefaults: defaults, storageKey: "settings")
+        var profile = EndpointProfile.defaultOpenAIProfile()
+        profile.openAI.enabledModels = ["m1", "m2"]
+        profile.openAI.model = "m1"
+        store.settings.profiles = [profile]
+        store.settings.autoInsertEnabled = false
+        let state = AppState()
+        let coordinator = AppCoordinator(
+            settings: store,
+            appState: state,
+            microphoneGate: StubMicrophoneGate(authorization: .granted, grants: true),
+            audioCapture: StubAudioCapture(),
+            providers: [provider],
+            textInserter: textInserter,
+            frontmostProvider: frontmost
+        )
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor(timeout: 4) { state.state == .idle || state.state == .failed }
+
+        XCTAssertEqual(state.state, .idle)
+        XCTAssertEqual(state.lastResult?.text, "第二个模型结果")
+        XCTAssertEqual(provider.requestedModels, ["m1", "m2"])
     }
 }

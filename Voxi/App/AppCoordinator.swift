@@ -44,10 +44,10 @@ final class AppCoordinator: ObservableObject {
     /// 快捷键触发时记录的前台应用 PID；输入前必须仍然一致。
     private var targetApplicationPID: pid_t?
 
-    /// 本次录音开始时锁定的模型链（按优先级）；中途改设置不影响本次。
-    private var sessionProfiles: [EndpointProfile] = []
-    private var attemptedProfileIDs: Set<UUID> = []
-    private var activeSessionProfile: EndpointProfile?
+    /// 本次录音开始时锁定的模型链（按来源、模型优先级）；中途改设置不影响本次。
+    private var sessionModels: [ASRModelCandidate] = []
+    private var attemptedModelIDs: Set<String> = []
+    private var activeSessionModel: ASRModelCandidate?
     /// 流式模型中途断开：继续录音，结束后用备用模型转写。
     private var streamingFailed = false
 
@@ -185,15 +185,15 @@ final class AppCoordinator: ObservableObject {
             Logger.app.debug("忽略重复的开始录音请求，当前状态 \(self.appState.state.rawValue, privacy: .public)")
             return
         }
-        let usableProfiles = settings.settings.profiles
-        guard let profile = usableProfiles.first else {
-            appState.present(error: AppError(message: "尚未配置可用的识别模型，请先在设置 → 模型中完善配置。"))
+        let candidates = settings.settings.asrCandidates
+        guard let first = candidates.first else {
+            appState.present(error: AppError(message: "尚未启用识别模型，请先在设置 → 模型中勾选模型。"))
             transition(to: .failed)
             return
         }
-        sessionProfiles = usableProfiles
-        attemptedProfileIDs = []
-        activeSessionProfile = nil
+        sessionModels = candidates
+        attemptedModelIDs = []
+        activeSessionModel = nil
         streamingFailed = false
 
         if appState.state == .failed {
@@ -210,8 +210,8 @@ final class AppCoordinator: ObservableObject {
         // 由面板在开始录音前恢复上一个应用的前台状态。
         let frontPID = frontmostProvider.currentPID()
         targetApplicationPID = frontPID == ProcessInfo.processInfo.processIdentifier ? nil : frontPID
-        appState.beginSession(id: sessionID, provider: profile.kind)
-        Logger.app.info("开始录音 session=\(sessionID.uuidString, privacy: .public) provider=\(profile.kind.rawValue, privacy: .public)")
+        appState.beginSession(id: sessionID, provider: first.profile.kind)
+        Logger.app.info("开始录音 session=\(sessionID.uuidString, privacy: .public) provider=\(first.profile.kind.rawValue, privacy: .public) model=\(first.model, privacy: .public)")
 
         switch microphoneGate.authorization {
         case .granted:
@@ -313,7 +313,7 @@ final class AppCoordinator: ObservableObject {
             cancelCurrentSession()
             return
         }
-        guard let firstProfile = sessionProfiles.first else {
+        guard let firstModel = sessionModels.first else {
             appState.present(error: AppError(message: "没有可用的识别模型。"))
             transition(to: .failed)
             return
@@ -327,7 +327,7 @@ final class AppCoordinator: ObservableObject {
         )
 
         // 第一个模型是流式时先显示“连接”；OpenAI-compatible 会话创建是即时的。
-        if firstProfile.kind == .volcengineStreaming {
+        if firstModel.profile.kind == .volcengineStreaming {
             transition(to: .connecting)
         }
 
@@ -338,9 +338,10 @@ final class AppCoordinator: ObservableObject {
                 Logger.app.debug("采集已启动（状态=\(self.appState.state.rawValue, privacy: .public)）")
 
                 var attempts: [String] = []
-                for profile in self.sessionProfiles {
+                for candidate in self.sessionModels {
+                    let profile = candidate.resolvedProfile
                     guard let provider = self.providers[profile.kind] else { continue }
-                    self.attemptedProfileIDs.insert(profile.id)
+                    self.attemptedModelIDs.insert(candidate.id)
                     do {
                         let session = try await provider.makeSession(profile: profile, options: options)
                         guard self.currentSessionID == sessionID,
@@ -350,8 +351,8 @@ final class AppCoordinator: ObservableObject {
                             return
                         }
                         self.transcriptionSession = session
-                        self.activeSessionProfile = profile
-                        Logger.app.debug("ASR 会话就绪 provider=\(profile.kind.rawValue, privacy: .public) model=\(profile.name, privacy: .public)")
+                        self.activeSessionModel = candidate
+                        Logger.app.debug("ASR 会话就绪 provider=\(profile.kind.rawValue, privacy: .public) source=\(candidate.sourceName, privacy: .public) model=\(candidate.model, privacy: .public)")
                         self.observeUpdates(session: session, sessionID: sessionID)
                         // 立即补发连接期间缓冲的音频，不必等下一个分片。
                         await self.flushPendingAudio(into: session)
@@ -362,9 +363,8 @@ final class AppCoordinator: ObservableObject {
                         }
                         return
                     } catch {
-                        let name = profile.name.isEmpty ? profile.kind.displayName : profile.name
-                        attempts.append("\(name)：\(error.localizedDescription)")
-                        Logger.app.error("模型「\(profile.name, privacy: .public)」连接失败，尝试下一个：\(String(describing: error), privacy: .public)")
+                        attempts.append("\(candidate.sourceName) · \(candidate.model)：\(error.localizedDescription)")
+                        Logger.app.error("模型「\(candidate.sourceName) · \(candidate.model, privacy: .public)」连接失败，尝试下一个：\(String(describing: error), privacy: .public)")
                     }
                 }
                 self.failStart(
@@ -593,45 +593,45 @@ final class AppCoordinator: ObservableObject {
     ) async throws -> TranscriptionResult {
         var attempts: [String] = []
 
-        if !streamingFailed, let session = transcriptionSession, let profile = activeSessionProfile {
+        if !streamingFailed, let session = transcriptionSession, let candidate = activeSessionModel {
             do {
                 let result = try await session.finish(recordingURL: wavURL)
                 if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     return result
                 }
-                attempts.append("\(displayName(profile))：返回空结果")
+                attempts.append("\(displayName(candidate))：返回空结果")
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                attempts.append("\(displayName(profile))：\(error.localizedDescription)")
+                attempts.append("\(displayName(candidate))：\(error.localizedDescription)")
             }
             transcriptionSession = nil
             updatesTask?.cancel()
             updatesTask = nil
         }
 
-        for profile in sessionProfiles where !attemptedProfileIDs.contains(profile.id) {
+        for candidate in sessionModels where !attemptedModelIDs.contains(candidate.id) {
             try Task.checkCancellation()
             guard currentSessionID == sessionID else { throw CancellationError() }
-            attemptedProfileIDs.insert(profile.id)
+            attemptedModelIDs.insert(candidate.id)
             do {
                 let result = try await transcribeRecordedFile(
                     wavURL,
-                    profile: profile,
+                    candidate: candidate,
                     duration: duration
                 )
                 if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Logger.app.info("备用模型「\(profile.name, privacy: .public)」转写成功")
+                    Logger.app.info("备用模型「\(candidate.sourceName) · \(candidate.model, privacy: .public)」转写成功")
                     return result
                 }
-                attempts.append("\(displayName(profile))：返回空结果")
+                attempts.append("\(displayName(candidate))：返回空结果")
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                Logger.app.error("备用模型「\(profile.name, privacy: .public)」失败：\(String(describing: error), privacy: .public)")
-                attempts.append("\(displayName(profile))：\(error.localizedDescription)")
+                Logger.app.error("备用模型「\(candidate.sourceName) · \(candidate.model, privacy: .public)」失败：\(String(describing: error), privacy: .public)")
+                attempts.append("\(displayName(candidate))：\(error.localizedDescription)")
             }
         }
 
@@ -641,9 +641,10 @@ final class AppCoordinator: ObservableObject {
     /// 用已经写好的 WAV 重新走一个模型；火山流式按 150ms 分片补发。
     private func transcribeRecordedFile(
         _ wavURL: URL,
-        profile: EndpointProfile,
+        candidate: ASRModelCandidate,
         duration: TimeInterval
     ) async throws -> TranscriptionResult {
+        let profile = candidate.resolvedProfile
         guard let provider = providers[profile.kind] else {
             throw TranscriptionError.unsupportedProvider(profile.kind)
         }
@@ -669,8 +670,8 @@ final class AppCoordinator: ObservableObject {
         return try await session.finish(recordingURL: wavURL)
     }
 
-    private func displayName(_ profile: EndpointProfile) -> String {
-        profile.name.isEmpty ? profile.kind.displayName : profile.name
+    private func displayName(_ candidate: ASRModelCandidate) -> String {
+        "\(candidate.sourceName) · \(candidate.model)"
     }
 
     /// 在后台执行可能阻塞的音频操作，并加超时保护，避免菜单栏状态永久卡住。
@@ -698,7 +699,7 @@ final class AppCoordinator: ObservableObject {
         guard currentSessionID == sessionID else { return }
         Logger.app.error("流式发送失败: \(String(describing: error), privacy: .public)")
 
-        let remaining = sessionProfiles.filter { !attemptedProfileIDs.contains($0.id) }
+        let remaining = sessionModels.filter { !attemptedModelIDs.contains($0.id) }
         cleanupTranscriptionSession()
         pendingAudio.removeAll()
 
@@ -736,7 +737,7 @@ final class AppCoordinator: ObservableObject {
             transcriptionSession = nil
             Task { await session.cancel() }
         }
-        activeSessionProfile = nil
+        activeSessionModel = nil
         capturedByteCount = 0
     }
 

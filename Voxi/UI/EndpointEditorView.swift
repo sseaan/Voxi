@@ -49,25 +49,78 @@ struct EndpointListView: View {
 
             SettingsListCard(
                 "语音识别模型",
-                footer: "按从上到下的顺序尝试；当前模型失败时自动切换到下一个，结束后立即插入结果。"
+                footer: "按来源分组；同一来源内从上到下尝试，来源顺序由上方列表决定。"
             ) {
-                ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
-                    if index > 0 {
-                        Divider().padding(.leading, 12).opacity(0.6)
-                    }
-                    modelRow(profile, index: index)
-                }
-                Divider().padding(.leading, 12).opacity(0.6)
-                Button {
-                    addingSource = true
-                } label: {
-                    Label("添加模型", systemImage: "plus")
+                let candidates = settings.settings.asrCandidates
+                if candidates.isEmpty {
+                    Text("尚未启用模型。请编辑来源，填写模型或从服务获取模型列表。")
                         .font(.system(size: 12))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(.secondary)
                         .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
+                        .padding(.vertical, 14)
+                } else {
+                    ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
+                        if index == 0 || candidates[index - 1].profile.id != candidate.profile.id {
+                            if index > 0 {
+                                Divider().padding(.leading, 12).opacity(0.6)
+                            }
+                            sourceHeader(candidate.profile)
+                        }
+                        modelRow(candidate, index: index)
+                    }
                 }
-                .buttonStyle(.plain)
+            }
+
+            SettingsListCard(
+                "语言模型",
+                footer: "用于按风格整理识别结果；点击选择实际调用的模型。"
+            ) {
+                if let languageModel = settings.settings.languageModel {
+                    let models = languageModel.effectiveModels
+                    if models.isEmpty {
+                        Text("尚未启用语言模型。请编辑来源，填写模型或从服务获取模型列表。")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 14)
+                    } else {
+                        ForEach(Array(models.enumerated()), id: \.offset) { index, model in
+                            if index > 0 {
+                                Divider().padding(.leading, 12).opacity(0.6)
+                            }
+                            languageModelListRow(model, profile: languageModel)
+                        }
+                    }
+                    Divider().padding(.leading, 12).opacity(0.6)
+                    Button {
+                        editingLanguageModel = languageModel
+                    } label: {
+                        Label("管理语言模型…", systemImage: "slider.horizontal.3")
+                            .font(.system(size: 12))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 10) {
+                        LanguageModelBadge(size: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("尚未配置语言模型")
+                                .font(.system(size: 13))
+                            Text("选择风格前需要先添加通用 OpenAI 接入")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("添加") {
+                            editingLanguageModel = LanguageModelProfile()
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                }
             }
         }
         .sheet(isPresented: $addingSource) {
@@ -164,6 +217,26 @@ struct EndpointListView: View {
             Text(credentialStatus(profile).text)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
+            Button {
+                moveSource(index, offset: -1)
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(index == 0 ? Color.secondary.opacity(0.3) : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(index == 0)
+            .help("上移来源")
+            Button {
+                moveSource(index, offset: 1)
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(index == profiles.count - 1 ? Color.secondary.opacity(0.3) : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(index == profiles.count - 1)
+            .help("下移来源")
             Button("修改") {
                 editing = EditingProfile(profile: profile, isNew: false)
             }
@@ -182,25 +255,49 @@ struct EndpointListView: View {
         .padding(.vertical, 9)
     }
 
-    private func modelRow(_ profile: EndpointProfile, index: Int) -> some View {
-        HStack(spacing: 10) {
+    private func sourceHeader(_ profile: EndpointProfile) -> some View {
+        HStack(spacing: 8) {
+            ProviderBadge(kind: profile.kind, size: 20)
+            Text(profile.name.isEmpty ? "未命名来源" : profile.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            CapabilityTag(
+                text: "语音识别",
+                color: Color(red: 0.33, green: 0.47, blue: 0.92)
+            )
+            Spacer()
+            Text("\(profile.effectiveModels.count) 个模型")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
+    private func modelRow(_ candidate: ASRModelCandidate, index: Int) -> some View {
+        let profile = candidate.profile
+        let models = profile.effectiveModels
+        let modelIndex = models.firstIndex(of: candidate.model) ?? 0
+        let canMove = profile.kind == .openAICompatible && models.count > 1
+        return HStack(spacing: 8) {
             Text("\(index + 1)")
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
                 .frame(width: 20, height: 20)
                 .background(Color.secondary.opacity(0.12), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text(modelName(profile).isEmpty ? "未填写模型" : modelName(profile))
+                Text(candidate.model)
                     .font(.system(size: 13))
                     .lineLimit(1)
-                Text("\(profile.name.isEmpty ? "未命名来源" : profile.name) · \(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎")")
+                Text("\(candidate.sourceName) · \(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎")")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             Button {
-                testingProfile = profile
+                testingProfile = candidate.resolvedProfile
             } label: {
                 Image(systemName: "bolt.horizontal.circle")
                     .foregroundStyle(.secondary)
@@ -208,46 +305,116 @@ struct EndpointListView: View {
             .buttonStyle(.plain)
             .help("测试这个模型")
             Button {
-                move(index, offset: -1)
+                moveModel(candidate, offset: -1)
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(index == 0 ? Color.secondary.opacity(0.3) : Color.secondary)
+                    .foregroundStyle(canMove && modelIndex > 0 ? Color.secondary : Color.secondary.opacity(0.3))
             }
             .buttonStyle(.plain)
-            .disabled(index == 0)
+            .disabled(!canMove || modelIndex == 0)
             .help("提高优先级")
             Button {
-                move(index, offset: 1)
+                moveModel(candidate, offset: 1)
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(index == profiles.count - 1 ? Color.secondary.opacity(0.3) : Color.secondary)
+                    .foregroundStyle(canMove && modelIndex < models.count - 1 ? Color.secondary : Color.secondary.opacity(0.3))
             }
             .buttonStyle(.plain)
-            .disabled(index == profiles.count - 1)
+            .disabled(!canMove || modelIndex == models.count - 1)
             .help("降低优先级")
             Button {
-                pendingDelete = profile
+                removeModel(candidate)
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
-            .disabled(profiles.count <= 1)
-            .help("删除模型")
+            .disabled(models.count <= 1)
+            .help("从来源中移除这个模型")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
     }
 
-    private func move(_ index: Int, offset: Int) {
+    private func languageModelListRow(_ model: String, profile: LanguageModelProfile) -> some View {
+        Button {
+            guard var updated = settings.settings.languageModel else { return }
+            updated.model = model
+            settings.settings.languageModel = updated
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: model == profile.model
+                      ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(model == profile.model
+                                     ? Color.accentColor : Color.secondary.opacity(0.45))
+                Text(model)
+                    .font(.system(size: 13))
+                Spacer()
+                Text("通用 OpenAI")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                if model == profile.model {
+                    Text("使用中")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(.green)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.12), in: Capsule())
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func moveSource(_ index: Int, offset: Int) {
         let target = index + offset
         guard profiles.indices.contains(index), profiles.indices.contains(target) else { return }
         var updated = profiles
         updated.swapAt(index, target)
         settings.settings.profiles = updated
         settings.settings.activeProfileID = updated.first?.id
+    }
+
+    private func moveModel(_ candidate: ASRModelCandidate, offset: Int) {
+        guard candidate.profile.kind == .openAICompatible,
+              let profileIndex = settings.settings.profiles.firstIndex(where: {
+                  $0.id == candidate.profile.id
+              })
+        else { return }
+        var profile = settings.settings.profiles[profileIndex]
+        var models = profile.openAI.enabledModels ?? [profile.openAI.model]
+        guard let index = models.firstIndex(of: candidate.model) else { return }
+        let target = index + offset
+        guard models.indices.contains(target) else { return }
+        models.swapAt(index, target)
+        profile.openAI.enabledModels = models
+        profile.openAI.model = models.first ?? profile.openAI.model
+        settings.settings.profiles[profileIndex] = profile
+        settings.settings.activeProfileID = settings.settings.profiles.first?.id
+    }
+
+    private func removeModel(_ candidate: ASRModelCandidate) {
+        guard candidate.profile.kind == .openAICompatible,
+              let profileIndex = settings.settings.profiles.firstIndex(where: {
+                  $0.id == candidate.profile.id
+              })
+        else { return }
+        var profile = settings.settings.profiles[profileIndex]
+        guard var models = profile.openAI.enabledModels,
+              models.count > 1,
+              let index = models.firstIndex(of: candidate.model)
+        else { return }
+        models.remove(at: index)
+        profile.openAI.enabledModels = models
+        profile.openAI.model = models.first ?? profile.openAI.model
+        settings.settings.profiles[profileIndex] = profile
+        settings.settings.activeProfileID = settings.settings.profiles.first?.id
     }
 
     private func deleteSecrets(of profile: EndpointProfile) {
@@ -325,7 +492,11 @@ struct EndpointListView: View {
 
     private func sourceSummary(_ profile: EndpointProfile) -> String {
         let provider = profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎"
-        let model = modelName(profile)
+        let models = profile.effectiveModels
+        if models.count > 1 {
+            return "\(provider) · \(models.count) 个模型"
+        }
+        let model = models.first ?? ""
         return model.isEmpty ? provider : "\(provider) · \(model)"
     }
 
@@ -542,6 +713,10 @@ private struct LanguageModelEditorSheet: View {
     @State private var draft: LanguageModelProfile
     @State private var apiKeyInput = ""
     @State private var message: String?
+    @State private var showingModelPicker = false
+    @State private var fetchedModels: [String] = []
+    @State private var fetchingModels = false
+    @State private var modelFetchMessage: String?
     private let onSave: (LanguageModelProfile) -> Void
     private let onCancel: () -> Void
     private let keychain = KeychainService.shared
@@ -590,10 +765,51 @@ private struct LanguageModelEditorSheet: View {
                             .font(.system(size: 12, design: .monospaced))
                         }
                         SettingsDivider()
-                        SettingsFieldRow("model") {
-                            TextField("gpt-4o-mini", text: $draft.model)
+                        SettingsFieldRow(
+                            "model",
+                            subtitle: "手动填写会改为单模型；多模型请用「获取模型列表」勾选。"
+                        ) {
+                            HStack(spacing: 8) {
+                                TextField(
+                                    "gpt-4o-mini",
+                                    text: Binding(
+                                        get: { draft.model },
+                                        set: { newValue in
+                                            draft.model = newValue
+                                            draft.enabledModels = nil
+                                        }
+                                    )
+                                )
                                 .textFieldStyle(.roundedBorder)
-                                .frame(width: 200)
+                                .frame(width: 150)
+                                Button(fetchingModels ? "获取中…" : "获取模型列表…") {
+                                    fetchModels()
+                                }
+                                .controlSize(.small)
+                                .disabled(fetchingModels)
+                            }
+                        }
+                        if let enabled = draft.enabledModels, !enabled.isEmpty {
+                            SettingsDivider()
+                            SettingsFieldRow(
+                                "已启用",
+                                subtitle: "\(enabled.count) 个模型；会出现在模型页的语言模型列表"
+                            ) {
+                                Text(enabled.joined(separator: "、"))
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: 240, alignment: .trailing)
+                            }
+                        }
+                        if let modelFetchMessage {
+                            SettingsDivider()
+                            Text(modelFetchMessage)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
                         }
                     }
 
@@ -674,6 +890,47 @@ private struct LanguageModelEditorSheet: View {
             .padding(.vertical, 12)
         }
         .frame(width: 640, height: 560)
+        .sheet(isPresented: $showingModelPicker) {
+            ModelPickerSheet(
+                title: "选择启用的语言模型",
+                models: fetchedModels,
+                selected: Set(draft.enabledModels ?? [draft.model])
+            ) { selected in
+                let ordered = fetchedModels.filter { selected.contains($0) }
+                draft.enabledModels = ordered
+                if let first = ordered.first {
+                    draft.model = first
+                }
+                showingModelPicker = false
+            } onCancel: {
+                showingModelPicker = false
+            }
+        }
+    }
+
+    private func fetchModels() {
+        modelFetchMessage = nil
+        fetchingModels = true
+        let profile = draft
+        let key = apiKeyInput
+        Task {
+            do {
+                let models = try await ProviderModelsService().fetchLanguageModels(
+                    profile: profile,
+                    apiKeyInput: key
+                )
+                var list = models
+                let current = profile.model.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !current.isEmpty, !list.contains(current) {
+                    list.insert(current, at: 0)
+                }
+                fetchedModels = list
+                showingModelPicker = true
+            } catch {
+                modelFetchMessage = error.localizedDescription
+            }
+            fetchingModels = false
+        }
     }
 
     private func save() {
@@ -747,6 +1004,123 @@ private struct EndpointEditorSheet: View {
     }
 }
 
+private struct ModelPickerSheet: View {
+    let title: String
+    let models: [String]
+    let onApply: (Set<String>) -> Void
+    let onCancel: () -> Void
+    @State private var selected: Set<String>
+    @State private var query = ""
+
+    init(
+        title: String,
+        models: [String],
+        selected: Set<String>,
+        onApply: @escaping (Set<String>) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.title = title
+        self.models = models
+        self.onApply = onApply
+        self.onCancel = onCancel
+        _selected = State(initialValue: selected)
+    }
+
+    private var filteredModels: [String] {
+        let needle = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !needle.isEmpty else { return models }
+        return models.filter { $0.localizedCaseInsensitiveContains(needle) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                Spacer()
+                Button("全选") { selected = Set(models) }
+                    .controlSize(.small)
+                Button("清空") { selected = [] }
+                    .controlSize(.small)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                TextField("搜索模型", text: $query)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5))
+            }
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(filteredModels.enumerated()), id: \.element) { index, model in
+                        if index > 0 {
+                            Divider().padding(.leading, 26)
+                        }
+                        Button {
+                            if selected.contains(model) {
+                                selected.remove(model)
+                            } else {
+                                selected.insert(model)
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: selected.contains(model)
+                                      ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(selected.contains(model)
+                                                     ? Color.accentColor : Color.secondary.opacity(0.45))
+                                Text(model)
+                                    .font(.system(size: 12.5))
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .frame(minHeight: 220, maxHeight: 320)
+            .background(
+                Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.07), lineWidth: 1)
+            )
+
+            HStack {
+                Text("已选择 \(selected.count) 个")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("取消") { onCancel() }
+                Button("应用") { onApply(selected) }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(selected.isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 480)
+    }
+}
+
 struct EndpointEditorView: View {
     @Binding var draft: EndpointProfile
     let isActive: Bool
@@ -760,6 +1134,10 @@ struct EndpointEditorView: View {
     @State private var accessKeyInput = ""
     @State private var secretFieldInputs: [UUID: String] = [:]
     @State private var localMessage: String?
+    @State private var showingModelPicker = false
+    @State private var fetchedModels: [String] = []
+    @State private var fetchingModels = false
+    @State private var modelFetchMessage: String?
 
     private let keychain = KeychainService.shared
 
@@ -787,6 +1165,22 @@ struct EndpointEditorView: View {
 
             Divider()
             actionBar
+        }
+        .sheet(isPresented: $showingModelPicker) {
+            ModelPickerSheet(
+                title: "选择启用的模型",
+                models: fetchedModels,
+                selected: Set(draft.openAI.enabledModels ?? [draft.openAI.model])
+            ) { selected in
+                let ordered = fetchedModels.filter { selected.contains($0) }
+                draft.openAI.enabledModels = ordered
+                if let first = ordered.first {
+                    draft.openAI.model = first
+                }
+                showingModelPicker = false
+            } onCancel: {
+                showingModelPicker = false
+            }
         }
     }
 
@@ -858,10 +1252,51 @@ struct EndpointEditorView: View {
 
     private var openAICard: some View {
         SettingsListCard("OpenAI-compatible") {
-            SettingsFieldRow("model", subtitle: "必填；不同服务的模型名不同。") {
-                TextField("例如 whisper-1 / sensevoice", text: $draft.openAI.model)
+            SettingsFieldRow(
+                "model",
+                subtitle: "手动填写会改为单模型；多模型请用「获取模型列表」。"
+            ) {
+                HStack(spacing: 8) {
+                    TextField(
+                        "例如 whisper-1 / sensevoice",
+                        text: Binding(
+                            get: { draft.openAI.model },
+                            set: { newValue in
+                                draft.openAI.model = newValue
+                                draft.openAI.enabledModels = nil
+                            }
+                        )
+                    )
                     .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 260)
+                    .frame(width: 180)
+                    Button(fetchingModels ? "获取中…" : "获取模型列表…") {
+                        fetchASRModels()
+                    }
+                    .controlSize(.small)
+                    .disabled(fetchingModels)
+                }
+            }
+            if let enabled = draft.openAI.enabledModels, !enabled.isEmpty {
+                SettingsDivider()
+                SettingsFieldRow(
+                    "已启用",
+                    subtitle: "\(enabled.count) 个模型；会出现在模型页的语音识别模型列表"
+                ) {
+                    Text(enabled.joined(separator: "、"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .frame(maxWidth: 250, alignment: .trailing)
+                }
+            }
+            if let message = modelFetchMessage {
+                SettingsDivider()
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
             }
             SettingsDivider()
             SettingsFieldRow("鉴权方式") {
@@ -1150,6 +1585,33 @@ struct EndpointEditorView: View {
                 }
             }
         )
+    }
+
+    // MARK: - 模型列表
+
+    private func fetchASRModels() {
+        modelFetchMessage = nil
+        fetchingModels = true
+        let profile = draft
+        let key = apiKeyInput
+        Task {
+            do {
+                let models = try await ProviderModelsService().fetchASRModels(
+                    profile: profile,
+                    apiKeyInput: key
+                )
+                var list = models
+                let current = profile.openAI.model.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !current.isEmpty, !list.contains(current) {
+                    list.insert(current, at: 0)
+                }
+                fetchedModels = list
+                showingModelPicker = true
+            } catch {
+                modelFetchMessage = error.localizedDescription
+            }
+            fetchingModels = false
+        }
     }
 
     // MARK: - 保存

@@ -267,3 +267,17 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
    - 录音：ASR 成功后、插入前调用语言模型；失败时插入原文并通过 notice 提示。
    - 文件：转写完成后按风格整理再显示；失败保留原文。
    - LLM 只接收文本，不接收录音；识别提示仍只作为 ASR 提示。
+
+## 第十轮：模型列表 + 多模型启用 + LLM 错误可读化（2026-11-15）
+
+1. **语言模型失败定位**
+   - 日志显示上次失败为 HTTP 402：`Insufficient balance`（OpenCode 账户余额不足），端点和 Key 本身可用。
+   - `ChatCompletionService` 对 401/402/403/404/429 增加中文提示（如“账户余额不足或额度用尽”），并保留原始响应。
+2. **一个来源启用多个模型**
+   - `EndpointProfile.openAI.enabledModels` / `LanguageModelProfile.enabledModels` 保存勾选列表。
+   - 编辑来源新增“获取模型列表…”：从 `/models` 拉取（支持 `/v1/audio/transcriptions`、`/v1/chat/completions`、`/v1`、裸域名推导），弹窗搜索/全选/勾选后应用。
+   - 勾选的模型进入模型页：语音识别模型按来源分组展示、同一来源内可上移/下移/测试/移除；来源顺序可上移/下移。
+   - 语言模型页新增列表：显示所有勾选的语言模型，点击选择实际用于风格整理的模型。
+   - 运行时候选 = 来源顺序 × 模型顺序；录音/文件回退都按此链执行。
+3. **兼容**
+   - `enabledModels` 为可选字段，旧配置无此字段时回落到原来的单模型。

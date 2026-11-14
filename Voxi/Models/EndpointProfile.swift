@@ -111,6 +111,8 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         var customFormFields: [HTTPField] = []
         /// 仅对 loopback 地址生效：允许明文 HTTP。
         var allowsInsecureLocalHTTP: Bool = false
+        /// 从 /models 获取并勾选的多模型列表；nil 表示使用单个 `model`。
+        var enabledModels: [String]? = nil
     }
 
     struct VolcengineOptions: Codable, Equatable {

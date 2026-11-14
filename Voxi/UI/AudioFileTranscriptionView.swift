@@ -37,15 +37,15 @@ final class AudioFileTranscriptionModel: ObservableObject {
     }
 
     var providerName: String {
-        let profiles = settings.settings.profiles
-        guard let first = profiles.first else { return "未配置识别端点" }
-        return profiles.count > 1
-            ? "\(first.name) + \(profiles.count - 1) 个备用模型"
-            : first.name
+        let candidates = settings.settings.asrCandidates
+        guard let first = candidates.first else { return "未启用识别模型" }
+        return candidates.count > 1
+            ? "\(first.model) + \(candidates.count - 1) 个备用模型"
+            : "\(first.sourceName) · \(first.model)"
     }
 
     var canStart: Bool {
-        sourceURL != nil && !settings.settings.profiles.isEmpty && !phase.isBusy
+        sourceURL != nil && !settings.settings.asrCandidates.isEmpty && !phase.isBusy
     }
 
     func updateTargetPID(_ pid: pid_t?) {
@@ -67,7 +67,7 @@ final class AudioFileTranscriptionModel: ObservableObject {
     }
 
     func start() {
-        guard let sourceURL, !settings.settings.profiles.isEmpty, !phase.isBusy else { return }
+        guard let sourceURL, !settings.settings.asrCandidates.isEmpty, !phase.isBusy else { return }
         cleanTempFile()
         let wavURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("Voxi-upload-\(UUID().uuidString).wav")
@@ -173,11 +173,14 @@ final class AudioFileTranscriptionModel: ObservableObject {
 
     private func transcribeWithFallback(result: AudioFileConverter.Result) async throws {
         var attempts: [String] = []
-        let profiles = settings.settings.profiles
-        for (index, profile) in profiles.enumerated() {
+        let candidates = settings.settings.asrCandidates
+        for (index, candidate) in candidates.enumerated() {
             try Task.checkCancellation()
             do {
-                let text = try await transcribe(result: result, profile: profile)
+                let text = try await transcribe(
+                    result: result,
+                    profile: candidate.resolvedProfile
+                )
                 var styledText = text
                 var styleFailure: String?
                 let style = settings.settings.activeStyle
@@ -208,10 +211,10 @@ final class AudioFileTranscriptionModel: ObservableObject {
                 throw CancellationError()
             } catch {
                 if Task.isCancelled { throw CancellationError() }
-                let name = profile.name.isEmpty ? profile.kind.displayName : profile.name
+                let name = "\(candidate.sourceName) · \(candidate.model)"
                 attempts.append("\(name)：\(error.localizedDescription)")
                 interimText = ""
-                if index < profiles.count - 1 {
+                if index < candidates.count - 1 {
                     notice = "「\(name)」失败，正在尝试备用模型…"
                 }
             }

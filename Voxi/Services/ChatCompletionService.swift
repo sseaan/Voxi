@@ -17,9 +17,17 @@ struct ChatCompletionService {
             case .invalidConfiguration(let message):
                 return message
             case .http(let status, let message):
-                return message.isEmpty
-                    ? "语言模型请求失败（HTTP \(status)）。"
-                    : "语言模型请求失败（HTTP \(status)）：\(message)"
+                let hint: String
+                switch status {
+                case 401: hint = "API Key 无效或无权限"
+                case 402: hint = "账户余额不足或额度用尽"
+                case 403: hint = "无权访问该模型"
+                case 404: hint = "Endpoint 路径或模型不存在"
+                case 429: hint = "请求过于频繁或额度用尽"
+                default: hint = "服务返回错误"
+                }
+                let detail = message.isEmpty ? "" : "：\(message)"
+                return "语言模型请求失败（HTTP \(status)，\(hint)）\(detail)"
             case .invalidResponse:
                 return "语言模型返回了无法解析的响应。"
             case .emptyResponse:

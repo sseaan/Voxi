@@ -41,10 +41,12 @@
 		7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C819C7D57E572C842CA2968 /* RecordingMode.swift */; };
 		817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4C915665C4131D29A46F25A /* RecordingState.swift */; };
 		849995718F456BEB11D23800 /* ShortcutConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */; };
+		892EA6B9B7872487E58C6C94 /* ASRModelCandidate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DADD2FC03603CD6B52917ED3 /* ASRModelCandidate.swift */; };
 		894D5C137670E8C6F3E522D0 /* SettingsComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BA07218F732FAF6C028A66A /* SettingsComponents.swift */; };
 		8A2B48A3679448FF868F2BD2 /* AudioFileConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F067217F4BE9651B3005BC /* AudioFileConverter.swift */; };
 		8A3B8B9F6E277BD0E59C09BA /* ChatCompletionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635FCC88AB1DB58299AD0802 /* ChatCompletionService.swift */; };
 		9D9C7F7FC9F2D7353059540F /* TextMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B4F4122D8C07B3E0B8142E7 /* TextMode.swift */; };
+		A1096564593A9AFF2E4C4FD5 /* ProviderModelsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21B31DE2BCFD233261A62EF5 /* ProviderModelsTests.swift */; };
 		AC91CA76231E9B82277A96C3 /* TextInsertionServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B15C88AA5B7CCF918B97480B /* TextInsertionServiceTests.swift */; };
 		AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */; };
 		B03E02AA4D0D0A13474F5C22 /* EndpointTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FBB0B53BF9B0E3A9127E165 /* EndpointTestView.swift */; };
@@ -56,6 +58,7 @@
 		D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */; };
 		DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99076712E036C9926F2FF860 /* PermissionService.swift */; };
 		DD9B7087DF79F8746F2775ED /* LexiconView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3E0A566E2DC68EFC2F1A413 /* LexiconView.swift */; };
+		DF89D8E02B458974E7FFCA26 /* ProviderModelsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00472D076D8FC8F3CFA9586C /* ProviderModelsService.swift */; };
 		E6578F51F7B7033DAEB63702 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CADAA4F9510669F40A1C63A /* MenuBarView.swift */; };
 		EAA81FEED526CD5179958DB2 /* MultipartFormData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76BF701FBCCCD9DBD64C79EF /* MultipartFormData.swift */; };
 		EBAAFD71ABDE417D3A5C28DE /* WAVFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A2FE3515ED55DDB93AC08F /* WAVFileWriter.swift */; };
@@ -80,6 +83,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		00472D076D8FC8F3CFA9586C /* ProviderModelsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModelsService.swift; sourceTree = "<group>"; };
 		0765F3B1517F7C139568E4FF /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		0BDF7FFF4B1120ACA1C358AD /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
 		0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutService.swift; sourceTree = "<group>"; };
@@ -87,6 +91,7 @@
 		15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		1BA07218F732FAF6C028A66A /* SettingsComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsComponents.swift; sourceTree = "<group>"; };
 		1CBE2830CD787E53C94A6D55 /* TranscriptionResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionResult.swift; sourceTree = "<group>"; };
+		21B31DE2BCFD233261A62EF5 /* ProviderModelsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderModelsTests.swift; sourceTree = "<group>"; };
 		24418C6ADDD0F18D01E794AE /* ShortcutRecorderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRecorderView.swift; sourceTree = "<group>"; };
 		2587DF63EF71CEC809D477B7 /* ShortcutConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutConfiguration.swift; sourceTree = "<group>"; };
 		25CA3F36E3B96C0524780F4F /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
@@ -136,6 +141,7 @@
 		C65823D3D99A6C8F0917447C /* MainMenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainMenuBuilder.swift; sourceTree = "<group>"; };
 		D4C915665C4131D29A46F25A /* RecordingState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingState.swift; sourceTree = "<group>"; };
 		D6887B9BAB352F47FEE10FF5 /* AudioFileTranscriptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFileTranscriptionView.swift; sourceTree = "<group>"; };
+		DADD2FC03603CD6B52917ED3 /* ASRModelCandidate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ASRModelCandidate.swift; sourceTree = "<group>"; };
 		E1D36565ECDB1D74960D92BE /* TextInsertionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextInsertionService.swift; sourceTree = "<group>"; };
 		E289E6D0D35EB5BD2F3D8350 /* TranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionProvider.swift; sourceTree = "<group>"; };
 		EBC1B11E5EC2F1A4A06725F8 /* Voxi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Voxi-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -150,6 +156,7 @@
 		10889C1692D1193DB80FD076 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				DADD2FC03603CD6B52917ED3 /* ASRModelCandidate.swift */,
 				BB25ECE5D5F781B0090E8620 /* EndpointProfile.swift */,
 				0E34EFCA644FCFD00C034BEA /* LanguageModelProfile.swift */,
 				9E1FE6686E1230D6E2EBFEF5 /* PersonalLexicon.swift */,
@@ -171,6 +178,7 @@
 				A66E5B6D6978CD006477604B /* KeychainService.swift */,
 				3CE313A44633855EB3C56D93 /* OpenAICompatibleProvider.swift */,
 				99076712E036C9926F2FF860 /* PermissionService.swift */,
+				00472D076D8FC8F3CFA9586C /* ProviderModelsService.swift */,
 				25CA3F36E3B96C0524780F4F /* SettingsStore.swift */,
 				0C8E793CF27E8B2D2F8E31B3 /* ShortcutService.swift */,
 				F7E2043C750358D844318374 /* StyleProcessor.swift */,
@@ -273,6 +281,7 @@
 				5F83CACA557A637645E3C50B /* KeychainServiceTests.swift */,
 				95DE5E659AE18B0DD52D0CDA /* OpenAICompatibleProviderTests.swift */,
 				6B71EBD7F82413F7869F0192 /* PersonalLexiconTests.swift */,
+				21B31DE2BCFD233261A62EF5 /* ProviderModelsTests.swift */,
 				6CDBE6E17294DFD97106C0C7 /* RealServiceIntegrationTests.swift */,
 				EC27EFA708BBBB715AFF3207 /* RecordingStateTests.swift */,
 				15CFEE3757F6D97A7831994F /* SettingsStoreTests.swift */,
@@ -400,6 +409,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				892EA6B9B7872487E58C6C94 /* ASRModelCandidate.swift in Sources */,
 				38BB73D613FE0BBC327A4165 /* AppCoordinator.swift in Sources */,
 				1E91CC24B28460B53795E674 /* AppState.swift in Sources */,
 				2967FE7F6A394B26B56E3AED /* AudioCaptureService.swift in Sources */,
@@ -421,6 +431,7 @@
 				AE806F58C98C09CE0173B824 /* OpenAICompatibleProvider.swift in Sources */,
 				DBAD22065D03BA2D6CFFAB51 /* PermissionService.swift in Sources */,
 				2B184E1170F5AA6395100E74 /* PersonalLexicon.swift in Sources */,
+				DF89D8E02B458974E7FFCA26 /* ProviderModelsService.swift in Sources */,
 				35002225224AD73A25264C9F /* RecordingIndicatorController.swift in Sources */,
 				7EB9AB4160F578A2162EAD2A /* RecordingMode.swift in Sources */,
 				817E398EBE69A25842A7F6CE /* RecordingState.swift in Sources */,
@@ -456,6 +467,7 @@
 				70EC516514FD8F62F769A637 /* KeychainServiceTests.swift in Sources */,
 				111E0B0F2BF669FA8A0160E0 /* OpenAICompatibleProviderTests.swift in Sources */,
 				D16113899B6C5037C0FC57F5 /* PersonalLexiconTests.swift in Sources */,
+				A1096564593A9AFF2E4C4FD5 /* ProviderModelsTests.swift in Sources */,
 				5AE7C622229FB726E62A279D /* RealServiceIntegrationTests.swift in Sources */,
 				D9D6C752B044781273356DD0 /* RecordingStateTests.swift in Sources */,
 				CA3DB8DFFF343E91BFBF7ABD /* SettingsStoreTests.swift in Sources */,

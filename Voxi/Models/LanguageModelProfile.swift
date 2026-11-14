@@ -25,6 +25,8 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
     var apiKeyItemID: UUID?
     var timeoutSeconds: Double
     var temperature: Double
+    /// 从 /models 获取并勾选的模型；nil 表示只使用 `model`。
+    var enabledModels: [String]? = nil
 
     init(
         id: UUID = UUID(),
@@ -44,6 +46,19 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
         self.apiKeyItemID = apiKeyItemID
         self.timeoutSeconds = timeoutSeconds
         self.temperature = temperature
+    }
+
+    /// 已启用模型；没有多选时回落到单个 model。
+    var effectiveModels: [String] {
+        let values = (enabledModels ?? [])
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        if !values.isEmpty {
+            var seen = Set<String>()
+            return values.filter { seen.insert($0).inserted }
+        }
+        let manual = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        return manual.isEmpty ? [] : [manual]
     }
 
     /// 允许填完整 `/chat/completions`，也允许只填到 `/v1`。
