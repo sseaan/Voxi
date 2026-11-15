@@ -152,6 +152,8 @@ struct PCMChunker {
 /// 录音采集接口，便于协调器注入假实现做状态机测试。
 /// 实现必须可跨线程使用（引擎启动会在后台执行，避免阻塞主线程）。
 protocol AudioCapturing: AnyObject, Sendable {
+    /// 目标输入设备 UID；nil 表示跟随系统默认。必须在 `start()` 前设置。
+    var inputDeviceUID: String? { get set }
     /// 开始采集并返回 PCM 分片流；调用方必须持续消费。
     func start() throws -> AsyncStream<Data>
     /// 结束采集并返回录音元数据。
@@ -181,6 +183,19 @@ final class AudioCaptureService: AudioCapturing, @unchecked Sendable {
     private var startedAt: Date?
     private var currentURL: URL?
     private var isRunning = false
+    private var selectedInputDeviceUID: String?
+
+    /// 目标输入设备；nil 表示系统默认。录音开始后修改不影响本次录音。
+    var inputDeviceUID: String? {
+        get {
+            lock.lock(); defer { lock.unlock() }
+            return selectedInputDeviceUID
+        }
+        set {
+            lock.lock(); defer { lock.unlock() }
+            selectedInputDeviceUID = newValue
+        }
+    }
 
     var recordingURL: URL? {
         lock.lock(); defer { lock.unlock() }
@@ -199,6 +214,15 @@ final class AudioCaptureService: AudioCapturing, @unchecked Sendable {
         let writer = try WAVFileWriter(url: url)
 
         let engine = AVAudioEngine()
+        let requestedDeviceUID = selectedInputDeviceUID
+        var appliedDeviceUID: String?
+        if let requestedDeviceUID {
+            if AudioInputDevices.select(uid: requestedDeviceUID, on: engine) {
+                appliedDeviceUID = requestedDeviceUID
+            } else {
+                Logger.audio.error("无法切换到指定麦克风 uid=\(requestedDeviceUID, privacy: .public)，回落到系统默认")
+            }
+        }
         let input = engine.inputNode
         let hardwareFormat = input.inputFormat(forBus: 0)
         guard hardwareFormat.sampleRate > 0, hardwareFormat.channelCount > 0 else {
@@ -234,7 +258,7 @@ final class AudioCaptureService: AudioCapturing, @unchecked Sendable {
         self.currentURL = url
         self.isRunning = true
 
-        Logger.audio.info("开始采集 hardware=\(Int(hardwareFormat.sampleRate), privacy: .public)Hz ch=\(hardwareFormat.channelCount, privacy: .public) url=\(url.lastPathComponent, privacy: .public)")
+        Logger.audio.info("开始采集 hardware=\(Int(hardwareFormat.sampleRate), privacy: .public)Hz ch=\(hardwareFormat.channelCount, privacy: .public) device=\(appliedDeviceUID ?? "system-default", privacy: .public) url=\(url.lastPathComponent, privacy: .public)")
         return stream
     }
 

@@ -31,6 +31,14 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
             case .openCodeGo: return "deepseek-v4.1-flash"
             }
         }
+
+        /// Assets.xcassets 中的渠道图标；`nil` 表示使用通用图标。
+        var assetName: String? {
+            switch self {
+            case .openAICompatible: return nil
+            case .openCodeGo: return "ChannelOpenCode"
+            }
+        }
     }
 
     enum AuthMode: String, Codable, CaseIterable, Identifiable {
@@ -59,6 +67,8 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
     var temperature: Double
     /// 从 /models 获取并勾选的模型；nil 表示只使用 `model`。
     var enabledModels: [String]? = nil
+    /// 渠道预设；旧配置没有该字段时按「通用 OpenAI」处理。
+    var vendor: ModelVendor? = nil
 
     init(
         id: UUID = UUID(),
@@ -69,7 +79,8 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
         authMode: AuthMode = .bearer,
         apiKeyItemID: UUID? = nil,
         timeoutSeconds: Double = 60,
-        temperature: Double = 0.3
+        temperature: Double = 0.3,
+        vendor: ModelVendor = .custom
     ) {
         self.id = id
         self.kind = kind
@@ -80,6 +91,7 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
         self.apiKeyItemID = apiKeyItemID
         self.timeoutSeconds = timeoutSeconds
         self.temperature = temperature
+        self.vendor = vendor
     }
 
     /// 已启用模型；没有多选时回落到单个 model。
@@ -96,6 +108,9 @@ struct LanguageModelProfile: Identifiable, Codable, Equatable {
     }
 
     var providerKind: Kind { kind ?? .openAICompatible }
+
+    /// 渠道预设（旧配置为自定义）。
+    var resolvedVendor: ModelVendor { vendor ?? .custom }
 
     var providerDisplayName: String { providerKind.displayName }
 

@@ -80,6 +80,8 @@ struct SettingsView: View {
                 onRunOnboarding: runOnboarding,
                 onOpenTab: { tab = $0 }
             )
+        case .history:
+            HistoryView(settings: settings)
         case .general:
             GeneralSettingsView(settings: settings, permissions: coordinator.permissions)
         case .endpoints:
@@ -108,9 +110,17 @@ struct GeneralSettingsView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var permissions: PermissionService
     @State private var shortcutMessage: String?
+    @State private var inputDevices: [AudioInputDevices.Device] = []
 
     private var isAccessibilityTrusted: Bool {
         permissions.isAccessibilityTrusted()
+    }
+
+    private var microphoneSelection: Binding<String> {
+        Binding(
+            get: { settings.settings.microphoneUID ?? "" },
+            set: { settings.settings.microphoneUID = $0.isEmpty ? nil : $0 }
+        )
     }
 
     var body: some View {
@@ -130,6 +140,34 @@ struct GeneralSettingsView: View {
                     }
                     .labelsHidden()
                     .fixedSize()
+                }
+                SettingsDivider()
+                SettingsFieldRow(
+                    "麦克风",
+                    subtitle: "选择录音输入设备；系统默认跟随 macOS 声音设置"
+                ) {
+                    HStack(spacing: 6) {
+                        Picker("", selection: microphoneSelection) {
+                            Text("系统默认").tag("")
+                            if let uid = settings.settings.microphoneUID,
+                               !inputDevices.contains(where: { $0.id == uid }) {
+                                Text("已断开的设备").tag(uid)
+                            }
+                            ForEach(inputDevices) { device in
+                                Text(device.name).tag(device.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 200)
+                        .disabled(inputDevices.isEmpty && settings.settings.microphoneUID == nil)
+                        Button {
+                            inputDevices = AudioInputDevices.all()
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .controlSize(.small)
+                        .help("重新扫描输入设备")
+                    }
                 }
                 SettingsDivider()
                 SettingsFieldRow(
@@ -226,6 +264,7 @@ struct GeneralSettingsView: View {
         }
         .onAppear {
             permissions.refresh()
+            inputDevices = AudioInputDevices.all()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             permissions.refresh()
@@ -305,7 +344,7 @@ struct AboutSettingsView: View {
             Text("版本 \(Bundle.main.shortVersion) (\(Bundle.main.buildVersion))")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("本地录音，发送到你自己配置的语音识别服务。\n不保存历史，不上传第三方。")
+            Text("本地录音，发送到你自己配置的语音识别服务。\n识别文本只保存在本机历史记录（可随时关闭或清空），不上传第三方。")
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -316,10 +355,16 @@ struct AboutSettingsView: View {
             Text("自签名构建，不经过 Apple notarization。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Button("重新运行首次引导…") {
-                onRunOnboarding()
+            HStack(spacing: 10) {
+                Button("检查更新…") {
+                    Task { await UpdateController.shared.checkForUpdates() }
+                }
+                .controlSize(.small)
+                Button("重新运行首次引导…") {
+                    onRunOnboarding()
+                }
+                .controlSize(.small)
             }
-            .controlSize(.small)
             .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)

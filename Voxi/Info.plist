@@ -26,8 +26,15 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2025 Voxi</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Voxi 只在你把端点指向局域网 / EasyTier 等私有网络时访问本地网络，音频只会发送到你配置的端点。</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Voxi 仅在你按下快捷键录音时访问麦克风，用于把你说的内容转写为文字。录音只在你配置的语音识别服务处理，不会上传到 Voxi。</string>
 	<key>NSSupportsAutomaticTermination</key>

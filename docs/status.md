@@ -350,3 +350,38 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 - 词库页新增「Rime 个人词库」卡片；看板词库计数包含 Rime 热词；旧配置缺少新字段时按空导入状态迁移。
 - 测试：226 项，223 通过，3 项按环境跳过。
 - GitHub Actions 在推送 `v1.0.1` tag 后构建 universal Release（ad-hoc 签名）；本地自签名 Release 与 `dist/manifest.txt` 同步更新。
+
+## 第十六轮：局域网 / EasyTier 明文 HTTP 放行（2026-11-15）
+
+- 端点校验从「只允许 loopback 用 http」放宽为「本机 + 局域网 / 私有网段可用 http，仍需显式开关」：
+  - 新增 `LocalHostPolicy`（`Voxi/Models/LocalHostPolicy.swift`）：用 `inet_pton` 解析 IPv4 / IPv6，识别 loopback、`10/8`、`172.16/12`、`192.168/16`、`100.64/10`（CGNAT / Tailscale / EasyTier）、`169.254/16`、`fc00::/7`、`fe80::/10`、IPv4-mapped 私有地址，以及 `.local` / 单标签主机名。
+  - `EndpointProfile.isLocalNetworkEndpoint` 取代 loopback 判断参与 `openAICompatible` 的 http 校验；`allowsInsecureLocalHTTP` 开关从「允许本机明文 HTTP」改为「允许明文 HTTP」，在端点为本机 / 局域网时显示。
+  - 公网 IP 与公网域名即使打开开关仍拒绝（`insecureRemoteURL`），错误文案明确提示需要打开哪个开关。
+  - 火山引擎 `ws://` 仍只对 loopback 放开；语言模型端点仍只对 loopback 放开 http。
+- `project.yml` / `Voxi/Info.plist` 新增 `NSAppTransportSecurity.NSAllowsLocalNetworking` 与 `NSLocalNetworkUsageDescription`，保证明文 IP 地址与 `.local` 主机名在 ATS 层不被拦截。
+- 实测：`http://10.144.144.4:8080/v1/models` 在 EasyTier 网络内可达（返回 401，说明端点在线且需要鉴权）。
+- 测试：新增 `LocalHostPolicyTests`（loopback / 私有网段 / 公网边界、IPv6、前导零、zone id）与端点校验用例（私有网段 http 需开关、公网 http 始终拒绝、私有网段 https 无需开关）；全量 233 项：230 通过，3 项按环境跳过。
+
+## 第十七轮：多渠道 ASR、历史记录、原生菜单栏与更新（2026-11-15）
+
+- **阿里云百炼实时 ASR**：新增 `.aliyunBailianStreaming` provider（DashScope WebSocket）。`run-task` / `finish-task` 指令、`task-started` / `result-generated` / `task-finished` / `task-failed` 事件、逐句拼接、VAD 静音阈值、语义断句、标点预测、语气词过滤、热词表 ID 均可配置；端点页新增「阿里云百炼实时识别」卡片。
+- **小米 MiMo ASR**：新增 `.mimoASR` provider，走 `/v1/chat/completions` + base64 `input_audio`（不是 `/audio/transcriptions`），鉴权 header 为 `api-key`；单次音频上限约 10MB，超限直接提示缩短录音。
+- **渠道预设与图标**：`ModelVendor`（DeepSeek / MiniMax / MiMo）加入语言模型选择列表，预填 Endpoint/model 并使用 lobe-icons 品牌图标（`ChannelDeepSeek` / `ChannelMiniMax` / `ChannelMiMo`）；未知渠道回落到通用图标。ASR 选择列表同时加入百炼与 MiMo。
+- **检查更新**：新增 `UpdateChecker`（GitHub Releases API，可注入 URLSession 测试）与 `UpdateController`（NSAlert 交互）。菜单与 设置 → 关于 均可触发；不自动下载。评估文档 `docs/sparkle-update-plan.md` 结论为暂不引入 Sparkle。
+- **CI 发布**：Release 产物由 zip 改为 `Voxi-<version>.dmg`（内含首次启动说明与 `/Applications` 快捷方式），`manifest.txt` 记录 DMG / 二进制 SHA-256；release 说明底部自动附上「本次变更」（上一个 tag 起的提交摘要）。
+- **历史记录**：新增 `HistoryStore` 本机 JSON（默认开启、最多 1000 条、可关闭/清空），设置侧栏新增「历史记录」页，支持关键字、来源·模型、今天/近 7 天筛选，复制与单条删除。README 隐私描述同步更新。
+- **麦克风选择**：通用设置新增输入设备选择，`AudioInputDevices` 用 CoreAudio 枚举并用 `kAudioOutputUnitProperty_CurrentDevice` 切换引擎输入；`microphoneUID` 持久化在设置里。
+- **渠道图标补全**：新增 `ChannelVolcengine` / `ChannelAliyunBailian`（lobe-icons），四类 ASR 来源与三个语言模型渠道统一走 `ChannelIcon`；图标缺失时回落通用图标。
+- **模型列表改为扁平排序**：语音识别模型不再按来源分组，整张列表用箭头跨来源排序（`VoxiSettings.asrOrder` 持久化候选 id）；顶部「模型来源」列表移除上下移按钮，只保留修改/删除。旧配置无 `asrOrder` 时按来源×模型推导，新增模型追加到末尾。
+- **菜单栏**：改为原生 `NSMenu` 竖式列表（状态行 + 转写音频 / 设置 / 检查更新 / 提供反馈 / 退出），删除自绘 NSPanel 与 `MenuBarView`；错误恢复与复制识别结果仍保留为菜单项。
+- 测试：新增 `AliyunBailianProviderTests`、`MiMOASRProviderTests`、`UpdateCheckerTests`、`HistoryStoreTests`；全量 264 项：261 通过，3 项按环境跳过。
+
+## Voxi 1.1.0 发布（2026-11-15）
+
+- MARKETING_VERSION 提升到 1.1.0（build 3）。
+- 多渠道 ASR：阿里云百炼 Paraformer 实时识别、小米 MiMo `/chat/completions` + base64 音频；OpenAI 兼容渠道预设（DeepSeek / MiniMax / MiMo）与品牌图标（含火山引擎、百炼、OpenCode）。
+- 模型页：语音识别模型改为扁平列表，可跨来源排序（`asrOrder`）；模型来源列表不再排序。
+- 新增本地识别历史（设置 → 历史记录：搜索、按模型/时间筛选、复制、清空、可关闭）；通用设置支持选择麦克风。
+- 菜单栏改为原生 `NSMenu`（状态 + 转写音频 / 设置 / 检查更新 / 提供反馈 / 退出）；新增基于 GitHub Releases 的检查更新与 Sparkle 评估文档。
+- Release 产物改为 `Voxi-<version>.dmg`，release 说明底部附本次提交摘要。
+- 测试：264 项，261 通过，3 项按环境跳过。

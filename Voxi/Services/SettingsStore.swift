@@ -22,6 +22,12 @@ struct VoxiSettings: Codable, Equatable {
     /// 首次引导是否完成。旧配置没有这个字段时按已完成处理，避免升级后强制引导。
     var hasCompletedOnboarding: Bool
     var usage: UsageStats
+    /// 识别历史保留策略；旧配置缺少该字段时默认开启、最多 1000 条。
+    var history: HistorySettings
+    /// 录音输入设备 UID；nil 表示跟随系统默认。
+    var microphoneUID: String?
+    /// 语音识别模型的显式回退顺序（`ASRModelCandidate.id`）；nil 表示按来源×模型推导。
+    var asrOrder: [String]?
 
     static let currentSchemaVersion = 1
 
@@ -40,7 +46,10 @@ struct VoxiSettings: Codable, Equatable {
         customStyles: [TranscriptionStyle] = [],
         languageModel: LanguageModelProfile? = nil,
         hasCompletedOnboarding: Bool = false,
-        usage: UsageStats = UsageStats()
+        usage: UsageStats = UsageStats(),
+        history: HistorySettings = HistorySettings(),
+        microphoneUID: String? = nil,
+        asrOrder: [String]? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.profiles = profiles
@@ -57,6 +66,9 @@ struct VoxiSettings: Codable, Equatable {
         self.languageModel = languageModel
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.usage = usage
+        self.history = history
+        self.microphoneUID = microphoneUID
+        self.asrOrder = asrOrder
     }
 
     /// 默认创建一个 OpenAI-compatible endpoint 示例（尚未填 Key）。
@@ -82,7 +94,8 @@ struct VoxiSettings: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, profiles, activeProfileID, recordingMode, shortcut,
              textMode, autoInsertEnabled, showInterimTextInMenuBar, lexicon, rime,
-             selectedStyleID, customStyles, languageModel, hasCompletedOnboarding, usage
+             selectedStyleID, customStyles, languageModel, hasCompletedOnboarding, usage,
+             history, microphoneUID, asrOrder
     }
 
     /// 旧配置缺少字段时使用默认值，而不是让整个设置反序列化失败。
@@ -113,6 +126,9 @@ struct VoxiSettings: Codable, Equatable {
             forKey: .hasCompletedOnboarding
         ) ?? true
         usage = try container.decodeIfPresent(UsageStats.self, forKey: .usage) ?? UsageStats()
+        history = try container.decodeIfPresent(HistorySettings.self, forKey: .history) ?? HistorySettings()
+        microphoneUID = try container.decodeIfPresent(String.self, forKey: .microphoneUID)
+        asrOrder = try container.decodeIfPresent([String].self, forKey: .asrOrder)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -132,6 +148,9 @@ struct VoxiSettings: Codable, Equatable {
         try container.encodeIfPresent(languageModel, forKey: .languageModel)
         try container.encode(hasCompletedOnboarding, forKey: .hasCompletedOnboarding)
         try container.encode(usage, forKey: .usage)
+        try container.encode(history, forKey: .history)
+        try container.encodeIfPresent(microphoneUID, forKey: .microphoneUID)
+        try container.encodeIfPresent(asrOrder, forKey: .asrOrder)
     }
 }
 

@@ -124,6 +124,38 @@ final class ModelSelectionTests: XCTestCase {
         XCTAssertEqual(candidates.last?.resolvedProfile.volcengine.modelName, "bigmodel")
     }
 
+    func testExplicitASROrderOverridesProfileOrder() {
+        var first = EndpointProfile.defaultOpenAIProfile()
+        first.openAI.enabledModels = ["a", "b"]
+        var second = EndpointProfile.defaultVolcengineProfile()
+        second.volcengine.modelName = "bigmodel"
+        var settings = VoxiSettings()
+        settings.profiles = [first, second]
+
+        // 跨来源显式排序：火山排到最前，剩余模型保持原顺序。
+        settings.asrOrder = [
+            ASRModelCandidate(profile: second, model: "bigmodel").id,
+            ASRModelCandidate(profile: first, model: "b").id
+        ]
+        XCTAssertEqual(settings.asrCandidates.map(\.model), ["bigmodel", "b", "a"])
+
+        // 失效 id 被忽略；未记录的新模型追加到末尾。
+        settings.asrOrder = ["missing#id"]
+        XCTAssertEqual(settings.asrCandidates.map(\.model), ["a", "b", "bigmodel"])
+    }
+
+    func testASROrderRoundTripAndLegacyDefault() throws {
+        var settings = VoxiSettings()
+        settings.asrOrder = ["p#m1", "p#m2"]
+        let data = try JSONEncoder().encode(settings)
+        let decoded = try JSONDecoder().decode(VoxiSettings.self, from: data)
+        XCTAssertEqual(decoded.asrOrder, ["p#m1", "p#m2"])
+
+        let legacy = #"{"schemaVersion":1,"profiles":[],"recordingMode":"holdToTalk"}"#.data(using: .utf8)!
+        let old = try JSONDecoder().decode(VoxiSettings.self, from: legacy)
+        XCTAssertNil(old.asrOrder)
+    }
+
     func testLanguageModelEffectiveModels() {
         var profile = LanguageModelProfile()
         profile.model = "manual"

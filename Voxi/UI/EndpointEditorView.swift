@@ -28,7 +28,7 @@ struct EndpointListView: View {
                     if index > 0 {
                         Divider().padding(.leading, 12).opacity(0.6)
                     }
-                    sourceRow(profile, index: index)
+                    sourceRow(profile)
                 }
                 if let model = settings.settings.languageModel {
                     Divider().padding(.leading, 12).opacity(0.6)
@@ -49,7 +49,7 @@ struct EndpointListView: View {
 
             SettingsListCard(
                 "语音识别模型",
-                footer: "按来源分组；同一来源内从上到下尝试，来源顺序由上方列表决定。"
+                footer: "从上到下依次尝试；用箭头调整优先级（可跨来源），失败时自动换下一个。"
             ) {
                 let candidates = settings.settings.asrCandidates
                 if candidates.isEmpty {
@@ -60,13 +60,10 @@ struct EndpointListView: View {
                         .padding(.vertical, 14)
                 } else {
                     ForEach(Array(candidates.enumerated()), id: \.element.id) { index, candidate in
-                        if index == 0 || candidates[index - 1].profile.id != candidate.profile.id {
-                            if index > 0 {
-                                Divider().padding(.leading, 12).opacity(0.6)
-                            }
-                            sourceHeader(candidate.profile)
+                        if index > 0 {
+                            Divider().padding(.leading, 12).opacity(0.6)
                         }
-                        modelRow(candidate, index: index)
+                        modelRow(candidate, index: index, count: candidates.count)
                     }
                 }
             }
@@ -130,10 +127,13 @@ struct EndpointListView: View {
                     try? await Task.sleep(nanoseconds: 350_000_000)
                     switch choice {
                     case .asr(let kind):
-                        var profile = kind == .openAICompatible
-                            ? EndpointProfile.defaultOpenAIProfile()
-                            : EndpointProfile.defaultVolcengineProfile()
-                        profile.name = kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包"
+                        let profile: EndpointProfile
+                        switch kind {
+                        case .openAICompatible: profile = .defaultOpenAIProfile()
+                        case .volcengineStreaming: profile = .defaultVolcengineProfile()
+                        case .aliyunBailianStreaming: profile = .defaultAliyunProfile()
+                        case .mimoASR: profile = .defaultMiMOProfile()
+                        }
                         editing = EditingProfile(profile: profile, isNew: true)
                     case .languageModel(let kind):
                         if let existing = settings.settings.languageModel,
@@ -142,6 +142,15 @@ struct EndpointListView: View {
                         } else {
                             editingLanguageModel = LanguageModelProfile.defaultProfile(for: kind)
                         }
+                    case .languageVendor(let vendor):
+                        var profile = LanguageModelProfile(
+                            name: vendor.displayName,
+                            endpointURL: vendor.defaultEndpoint,
+                            model: vendor.defaultModel,
+                            vendor: vendor
+                        )
+                        profile.name = vendor.displayName
+                        editingLanguageModel = profile
                     }
                 }
             }
@@ -202,7 +211,7 @@ struct EndpointListView: View {
         }
     }
 
-    private func sourceRow(_ profile: EndpointProfile, index: Int) -> some View {
+    private func sourceRow(_ profile: EndpointProfile) -> some View {
         HStack(spacing: 10) {
             ProviderBadge(kind: profile.kind, size: 26)
             VStack(alignment: .leading, spacing: 2) {
@@ -221,26 +230,6 @@ struct EndpointListView: View {
             Text(credentialStatus(profile).text)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
-            Button {
-                moveSource(index, offset: -1)
-            } label: {
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(index == 0 ? Color.secondary.opacity(0.3) : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(index == 0)
-            .help("上移来源")
-            Button {
-                moveSource(index, offset: 1)
-            } label: {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(index == profiles.count - 1 ? Color.secondary.opacity(0.3) : Color.secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(index == profiles.count - 1)
-            .help("下移来源")
             Button("修改") {
                 editing = EditingProfile(profile: profile, isNew: false)
             }
@@ -259,31 +248,10 @@ struct EndpointListView: View {
         .padding(.vertical, 9)
     }
 
-    private func sourceHeader(_ profile: EndpointProfile) -> some View {
-        HStack(spacing: 8) {
-            ProviderBadge(kind: profile.kind, size: 20)
-            Text(profile.name.isEmpty ? "未命名来源" : profile.name)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.secondary)
-            CapabilityTag(
-                text: "语音识别",
-                color: Color(red: 0.33, green: 0.47, blue: 0.92)
-            )
-            Spacer()
-            Text("\(profile.effectiveModels.count) 个模型")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
-    }
-
-    private func modelRow(_ candidate: ASRModelCandidate, index: Int) -> some View {
+    private func modelRow(_ candidate: ASRModelCandidate, index: Int, count: Int) -> some View {
         let profile = candidate.profile
         let models = profile.effectiveModels
-        let modelIndex = models.firstIndex(of: candidate.model) ?? 0
-        let canMove = profile.kind == .openAICompatible && models.count > 1
+        let canRemove = profile.kind == .openAICompatible && models.count > 1
         return HStack(spacing: 8) {
             Text("\(index + 1)")
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -294,7 +262,7 @@ struct EndpointListView: View {
                 Text(candidate.model)
                     .font(.system(size: 13))
                     .lineLimit(1)
-                Text("\(candidate.sourceName) · \(profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎")")
+                Text("\(candidate.sourceName) · \(profile.kind.shortName)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -309,24 +277,24 @@ struct EndpointListView: View {
             .buttonStyle(.plain)
             .help("测试这个模型")
             Button {
-                moveModel(candidate, offset: -1)
+                moveCandidate(candidate, offset: -1)
             } label: {
                 Image(systemName: "chevron.up")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(canMove && modelIndex > 0 ? Color.secondary : Color.secondary.opacity(0.3))
+                    .foregroundStyle(index > 0 ? Color.secondary : Color.secondary.opacity(0.3))
             }
             .buttonStyle(.plain)
-            .disabled(!canMove || modelIndex == 0)
+            .disabled(index == 0)
             .help("提高优先级")
             Button {
-                moveModel(candidate, offset: 1)
+                moveCandidate(candidate, offset: 1)
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(canMove && modelIndex < models.count - 1 ? Color.secondary : Color.secondary.opacity(0.3))
+                    .foregroundStyle(index < count - 1 ? Color.secondary : Color.secondary.opacity(0.3))
             }
             .buttonStyle(.plain)
-            .disabled(!canMove || modelIndex == models.count - 1)
+            .disabled(index == count - 1)
             .help("降低优先级")
             Button {
                 removeModel(candidate)
@@ -335,7 +303,7 @@ struct EndpointListView: View {
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
-            .disabled(models.count <= 1)
+            .disabled(!canRemove)
             .help("从来源中移除这个模型")
         }
         .padding(.horizontal, 12)
@@ -376,31 +344,14 @@ struct EndpointListView: View {
         .buttonStyle(.plain)
     }
 
-    private func moveSource(_ index: Int, offset: Int) {
+    /// 扁平列表排序：把当前顺序固化为 `asrOrder`，再交换相邻两项（可跨来源）。
+    private func moveCandidate(_ candidate: ASRModelCandidate, offset: Int) {
+        var candidates = settings.settings.asrCandidates
+        guard let index = candidates.firstIndex(where: { $0.id == candidate.id }) else { return }
         let target = index + offset
-        guard profiles.indices.contains(index), profiles.indices.contains(target) else { return }
-        var updated = profiles
-        updated.swapAt(index, target)
-        settings.settings.profiles = updated
-        settings.settings.activeProfileID = updated.first?.id
-    }
-
-    private func moveModel(_ candidate: ASRModelCandidate, offset: Int) {
-        guard candidate.profile.kind == .openAICompatible,
-              let profileIndex = settings.settings.profiles.firstIndex(where: {
-                  $0.id == candidate.profile.id
-              })
-        else { return }
-        var profile = settings.settings.profiles[profileIndex]
-        var models = profile.openAI.enabledModels ?? [profile.openAI.model]
-        guard let index = models.firstIndex(of: candidate.model) else { return }
-        let target = index + offset
-        guard models.indices.contains(target) else { return }
-        models.swapAt(index, target)
-        profile.openAI.enabledModels = models
-        profile.openAI.model = models.first ?? profile.openAI.model
-        settings.settings.profiles[profileIndex] = profile
-        settings.settings.activeProfileID = settings.settings.profiles.first?.id
+        guard candidates.indices.contains(target) else { return }
+        candidates.swapAt(index, target)
+        settings.settings.asrOrder = candidates.map(\.id)
     }
 
     private func removeModel(_ candidate: ASRModelCandidate) {
@@ -442,7 +393,7 @@ struct EndpointListView: View {
 
     private func languageModelRow(_ model: LanguageModelProfile) -> some View {
         HStack(spacing: 10) {
-            LanguageModelBadge(kind: model.providerKind)
+            LanguageModelBadge(kind: model.providerKind, vendor: model.resolvedVendor)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(model.name.isEmpty ? model.providerDisplayName : model.name)
@@ -450,7 +401,7 @@ struct EndpointListView: View {
                         .lineLimit(1)
                     CapabilityTag(text: "语言模型", color: Color(red: 0.20, green: 0.68, blue: 0.48))
                 }
-                Text("\(model.providerDisplayName) · \(model.model)")
+                Text("\(model.resolvedVendor == .custom ? model.providerDisplayName : model.resolvedVendor.displayName) · \(model.model)")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -491,11 +442,21 @@ struct EndpointListView: View {
             return profile.openAI.model.trimmingCharacters(in: .whitespacesAndNewlines)
         case .volcengineStreaming:
             return profile.volcengine.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .aliyunBailianStreaming:
+            return profile.aliyun.model.trimmingCharacters(in: .whitespacesAndNewlines)
+        case .mimoASR:
+            return profile.mimo.model.trimmingCharacters(in: .whitespacesAndNewlines)
         }
     }
 
     private func sourceSummary(_ profile: EndpointProfile) -> String {
-        let provider = profile.kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎"
+        let provider: String
+        switch profile.kind {
+        case .openAICompatible: provider = "OpenAI-compatible"
+        case .volcengineStreaming: provider = "火山引擎"
+        case .aliyunBailianStreaming: provider = "阿里云百炼"
+        case .mimoASR: provider = "MiMo"
+        }
         let models = profile.effectiveModels
         if models.count > 1 {
             return "\(provider) · \(models.count) 个模型"
@@ -515,6 +476,8 @@ struct EndpointListView: View {
             }
             let hasBoth = profile.appKeyItemID != nil && profile.accessKeyItemID != nil
             return hasBoth ? ("••••••••", true) : ("未设置", false)
+        case .aliyunBailianStreaming, .mimoASR:
+            return profile.apiKeyItemID == nil ? ("未设置", false) : ("••••••••", true)
         }
     }
 }
@@ -524,32 +487,38 @@ private struct ProviderBadge: View {
     var size: CGFloat = 26
 
     var body: some View {
-        Image(systemName: kind == .openAICompatible ? "cloud.fill" : "waveform")
-            .font(.system(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(gradient, in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous))
+        ChannelIcon(
+            assetName: kind.assetName,
+            fallbackSymbol: systemImage,
+            size: size,
+            colors: colors,
+            accessibilityText: kind.displayName
+        )
     }
 
-    private var gradient: LinearGradient {
-        if kind == .openAICompatible {
-            return LinearGradient(
-                colors: [Color(red: 0.32, green: 0.55, blue: 0.98), Color(red: 0.20, green: 0.36, blue: 0.90)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+    private var systemImage: String {
+        switch kind {
+        case .openAICompatible, .aliyunBailianStreaming: return "cloud.fill"
+        case .volcengineStreaming, .mimoASR: return "waveform"
         }
-        return LinearGradient(
-            colors: [Color(red: 0.62, green: 0.40, blue: 0.98), Color(red: 0.44, green: 0.24, blue: 0.88)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    }
+
+    private var colors: [Color] {
+        switch kind {
+        case .openAICompatible:
+            return [Color(red: 0.32, green: 0.55, blue: 0.98), Color(red: 0.20, green: 0.36, blue: 0.90)]
+        case .aliyunBailianStreaming:
+            return [Color(red: 0.98, green: 0.55, blue: 0.18), Color(red: 0.90, green: 0.32, blue: 0.10)]
+        default:
+            return [Color(red: 0.62, green: 0.40, blue: 0.98), Color(red: 0.44, green: 0.24, blue: 0.88)]
+        }
     }
 }
 
 private enum ProviderChoice: Equatable {
     case asr(EndpointProfile.ProviderKind)
     case languageModel(LanguageModelProfile.Kind)
+    case languageVendor(ModelVendor)
 }
 
 private struct CapabilityTag: View {
@@ -568,33 +537,27 @@ private struct CapabilityTag: View {
 
 private struct LanguageModelBadge: View {
     var kind: LanguageModelProfile.Kind = .openAICompatible
+    var vendor: ModelVendor = .custom
     var size: CGFloat = 26
 
     var body: some View {
-        Image(systemName: kind == .openCodeGo ? "terminal.fill" : "brain")
-            .font(.system(size: size * 0.42, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(
-                gradient,
-                in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
-            )
-    }
-
-    private var gradient: LinearGradient {
-        if kind == .openCodeGo {
-            return LinearGradient(
-                colors: [Color(red: 0.20, green: 0.60, blue: 0.98), Color(red: 0.12, green: 0.36, blue: 0.88)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        return LinearGradient(
-            colors: [Color(red: 0.22, green: 0.74, blue: 0.54), Color(red: 0.10, green: 0.55, blue: 0.42)],
-            startPoint: .top,
-            endPoint: .bottom
+        ChannelIcon(
+            vendor: vendor,
+            assetName: kind.assetName,
+            fallbackSymbol: kind == .openCodeGo ? "terminal.fill" : "brain",
+            size: size,
+            colors: gradientColors,
+            accessibilityText: vendor == .custom ? kind.displayName : vendor.displayName
         )
     }
+
+    private var gradientColors: [Color] {
+        if kind == .openCodeGo {
+            return [Color(red: 0.20, green: 0.60, blue: 0.98), Color(red: 0.12, green: 0.36, blue: 0.88)]
+        }
+        return [Color(red: 0.22, green: 0.74, blue: 0.54), Color(red: 0.10, green: 0.55, blue: 0.42)]
+    }
+
 }
 
 private struct ProviderPickerSheet: View {
@@ -614,6 +577,10 @@ private struct ProviderPickerSheet: View {
                 asrCard(.openAICompatible)
                 asrCard(.volcengineStreaming)
             }
+            HStack(spacing: 10) {
+                asrCard(.aliyunBailianStreaming)
+                asrCard(.mimoASR)
+            }
 
             Text("语言模型")
                 .font(.system(size: 11, weight: .semibold))
@@ -622,6 +589,11 @@ private struct ProviderPickerSheet: View {
             HStack(spacing: 10) {
                 languageModelCard(.openAICompatible)
                 languageModelCard(.openCodeGo)
+            }
+            HStack(spacing: 10) {
+                channelCard(.deepSeek)
+                channelCard(.miniMax)
+                channelCard(.miMo)
             }
 
             Text(detail)
@@ -653,6 +625,8 @@ private struct ProviderPickerSheet: View {
                 return "OpenCode Go 专用端点（/inference/go/openai/v1），自动附带 OpenCode 会话头并使用 Chat Completions 格式。"
             }
             return "配置 OpenAI-compatible Chat Completions，用于在识别完成后按所选风格整理文本。与语音识别来源分开保存。"
+        case .languageVendor(let vendor):
+            return "通用 OpenAI 兼容渠道预设：默认 Endpoint 与 model 会按 \(vendor.displayName) 预填，仍可手动修改。" 
         }
     }
 
@@ -664,12 +638,14 @@ private struct ProviderPickerSheet: View {
             HStack(spacing: 10) {
                 ProviderBadge(kind: kind, size: 28)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(kind == .openAICompatible ? "OpenAI-compatible" : "火山引擎豆包")
-                        .font(.system(size: 13, weight: .medium))
+                    Text(kind.shortName)
+                        .font(.system(size: 12.5, weight: .medium))
                         .foregroundStyle(.primary)
-                    Text(kind == .openAICompatible ? "HTTP / multipart 转写" : "WebSocket 流式识别")
+                        .lineLimit(1)
+                    Text(Self.asrSubtitle(kind))
                         .font(.system(size: 10.5))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -678,6 +654,55 @@ private struct ProviderPickerSheet: View {
             }
             .padding(.horizontal, 13)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    static func asrSubtitle(_ kind: EndpointProfile.ProviderKind) -> String {
+        switch kind {
+        case .openAICompatible: return "HTTP / multipart 转写"
+        case .volcengineStreaming: return "WebSocket 流式识别"
+        case .aliyunBailianStreaming: return "WebSocket 实时识别"
+        case .mimoASR: return "Chat Completions + base64"
+        }
+    }
+
+    private func channelCard(_ vendor: ModelVendor) -> some View {
+        let isSelected = selected == .languageVendor(vendor)
+        return Button {
+            selected = .languageVendor(vendor)
+        } label: {
+            HStack(spacing: 10) {
+                ChannelIcon(vendor: vendor, size: 28)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(vendor.displayName)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Text(vendor.subtitle)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.45))
+            }
+            .padding(.horizontal, 11)
+            .frame(maxWidth: .infinity, minHeight: 62, alignment: .leading)
             .background(
                 isSelected ? Color.accentColor.opacity(0.08) : Color(nsColor: .controlBackgroundColor),
                 in: RoundedRectangle(cornerRadius: 11, style: .continuous)
@@ -805,6 +830,24 @@ private struct LanguageModelEditorSheet: View {
                             }
                             .labelsHidden()
                             .fixedSize()
+                        }
+                        if draft.providerKind == .openAICompatible {
+                            SettingsDivider()
+                            SettingsFieldRow(
+                                "渠道预设",
+                                subtitle: "只影响默认 Endpoint / model 与图标，仍可手动修改"
+                            ) {
+                                Picker("", selection: Binding(
+                                    get: { draft.resolvedVendor },
+                                    set: { applyVendor($0) }
+                                )) {
+                                    ForEach(ModelVendor.allCases) { vendor in
+                                        Text(vendor.displayName).tag(vendor)
+                                    }
+                                }
+                                .labelsHidden()
+                                .fixedSize()
+                            }
                         }
                         if draft.providerKind == .openAICompatible,
                            draft.endpointURL.contains("opencode.ai") {
@@ -1008,6 +1051,17 @@ private struct LanguageModelEditorSheet: View {
             }
             fetchingModels = false
         }
+    }
+
+    private func applyVendor(_ vendor: ModelVendor) {
+        let previous = draft.resolvedVendor
+        draft.vendor = vendor
+        if draft.name.isEmpty || draft.name == previous.displayName || draft.name == "通用 OpenAI" {
+            draft.name = vendor.displayName
+        }
+        draft.endpointURL = vendor.defaultEndpoint
+        draft.model = vendor.defaultModel
+        draft.enabledModels = nil
     }
 
     private func save() {
@@ -1230,11 +1284,16 @@ struct EndpointEditorView: View {
                         header
                     }
                     generalCard
-                    if draft.kind == .openAICompatible {
+                    switch draft.kind {
+                    case .openAICompatible:
                         openAICard
                         customFieldsCard
-                    } else {
+                    case .volcengineStreaming:
                         volcengineCard
+                    case .aliyunBailianStreaming:
+                        aliyunCard
+                    case .mimoASR:
+                        mimoCard
                     }
                 }
                 .frame(maxWidth: 580, alignment: .leading)
@@ -1303,24 +1362,27 @@ struct EndpointEditorView: View {
                             draft.endpointURL = "https://api.openai.com/v1/audio/transcriptions"
                         case .volcengineStreaming:
                             draft.endpointURL = "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"
+                        case .aliyunBailianStreaming:
+                            draft.endpointURL = "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+                        case .mimoASR:
+                            draft.endpointURL = "https://api.xiaomimimo.com/v1/chat/completions"
                         }
                         draft.kind = newKind
                         localMessage = nil
                     }
                 )) {
-                    Text("OpenAI-compatible").tag(EndpointProfile.ProviderKind.openAICompatible)
-                    Text("火山引擎流式").tag(EndpointProfile.ProviderKind.volcengineStreaming)
+                    ForEach(EndpointProfile.ProviderKind.allCases) { kind in
+                        Text(kind.displayName).tag(kind)
+                    }
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.menu)
                 .labelsHidden()
-                .frame(width: 300)
+                .frame(width: 240)
             }
             SettingsDivider()
             SettingsFieldRow(
                 "Endpoint",
-                subtitle: draft.kind == .openAICompatible
-                    ? "HTTPS；仅本机 loopback 可在下方明确允许 HTTP。Voxi 不会替换你填写的路径。"
-                    : "WebSocket（wss://）。可填写控制台实际开通的兼容地址。"
+                subtitle: Self.endpointHint(for: draft.kind)
             ) {
                 TextField("完整 URL", text: $draft.endpointURL)
                     .textFieldStyle(.roundedBorder)
@@ -1439,9 +1501,12 @@ struct EndpointEditorView: View {
                     .controlSize(.small)
                     .labelsHidden()
             }
-            if draft.isLoopbackEndpoint {
+            if draft.isLocalNetworkEndpoint {
                 SettingsDivider()
-                SettingsFieldRow("允许本机明文 HTTP", subtitle: "仅对 loopback 地址生效") {
+                SettingsFieldRow(
+                    "允许明文 HTTP",
+                    subtitle: "仅对本机 / 局域网生效（含 EasyTier 等私有网段）"
+                ) {
                     Toggle("", isOn: $draft.openAI.allowsInsecureLocalHTTP)
                         .toggleStyle(.switch)
                         .controlSize(.small)
@@ -1516,6 +1581,137 @@ struct EndpointEditorView: View {
                         Image(systemName: "minus.circle")
                     }
                     .buttonStyle(.borderless)
+                }
+            }
+        }
+    }
+
+    static func endpointHint(for kind: EndpointProfile.ProviderKind) -> String {
+        switch kind {
+        case .openAICompatible:
+            return "HTTPS；本机 / 局域网可在下方明确允许 HTTP。Voxi 不会替换你填写的路径。"
+        case .volcengineStreaming:
+            return "WebSocket（wss://）。可填写控制台实际开通的兼容地址。"
+        case .aliyunBailianStreaming:
+            return "百炼 DashScope WebSocket（wss://…/api-ws/v1/inference）；可用工作空间专属域名。"
+        case .mimoASR:
+            return "MiMo 走 /chat/completions（不是 /audio/transcriptions）；HTTPS 或本机 / 局域网 HTTP。"
+        }
+    }
+
+    // MARK: - 阿里云百炼
+
+    private var aliyunCard: some View {
+        SettingsListCard(
+            "阿里云百炼实时识别",
+            footer: "使用 DashScope Paraformer WebSocket：Authorization: Bearer <API Key>。热词需先在百炼控制台创建词表后填写 ID。"
+        ) {
+            SettingsFieldRow(
+                "API Key",
+                subtitle: "保存到 Keychain；更新后首次读取可能需要选择“始终允许”。"
+            ) {
+                secretInput(text: $apiKeyInput, hasExisting: draft.apiKeyItemID != nil)
+            }
+            SettingsDivider()
+            SettingsFieldRow("model") {
+                TextField("paraformer-realtime-v2", text: $draft.aliyun.model)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+            SettingsDivider()
+            SettingsFieldRow("language_hints", subtitle: "逗号分隔，例如 zh,en；留空自动识别") {
+                TextField("zh", text: $draft.aliyun.languageHints)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 160)
+            }
+            SettingsDivider()
+            SettingsFieldRow("语义断句", subtitle: "开启后关闭 VAD 断句（适合会议转写）") {
+                Toggle("", isOn: $draft.aliyun.semanticPunctuation)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+            SettingsDivider()
+            SettingsFieldRow("VAD 静音阈值", subtitle: "毫秒，200–6000；语义断句开启时不生效") {
+                TextField("1300", value: $draft.aliyun.maxSentenceSilence, format: .number)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 80)
+            }
+            SettingsDivider()
+            SettingsFieldRow("标点预测") {
+                Toggle("", isOn: $draft.aliyun.punctuationPrediction)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+            SettingsDivider()
+            SettingsFieldRow("过滤语气词") {
+                Toggle("", isOn: $draft.aliyun.disfluencyRemoval)
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
+            }
+            SettingsDivider()
+            SettingsFieldRow("热词表 ID", subtitle: "可选，百炼控制台创建") {
+                TextField("", text: $draft.aliyun.vocabularyID)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+                    .frame(width: 200)
+            }
+            SettingsDivider()
+            SettingsFieldRow("超时") {
+                HStack(spacing: 6) {
+                    TextField("60", value: $draft.aliyun.timeoutSeconds, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 70)
+                    Text("秒")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    // MARK: - 小米 MiMo
+
+    private var mimoCard: some View {
+        SettingsListCard(
+            "小米 MiMo 语音识别",
+            footer: "MiMo 不使用 /v1/audio/transcriptions：音频以 base64 input_audio 发送到 /chat/completions，鉴权 header 为 api-key。单次音频上限约 10MB。"
+        ) {
+            SettingsFieldRow(
+                "API Key",
+                subtitle: "保存到 Keychain；以 api-key header 发送。"
+            ) {
+                secretInput(text: $apiKeyInput, hasExisting: draft.apiKeyItemID != nil)
+            }
+            SettingsDivider()
+            SettingsFieldRow("model") {
+                TextField("mimo-v2.5-asr", text: $draft.mimo.model)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12, design: .monospaced))
+            }
+            SettingsDivider()
+            SettingsFieldRow("超时") {
+                HStack(spacing: 6) {
+                    TextField("120", value: $draft.mimo.timeoutSeconds, format: .number)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 70)
+                    Text("秒")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if draft.isLocalNetworkEndpoint {
+                SettingsDivider()
+                SettingsFieldRow(
+                    "允许明文 HTTP",
+                    subtitle: "仅对本机 / 局域网生效（含 EasyTier 等私有网段）"
+                ) {
+                    Toggle("", isOn: $draft.mimo.allowsInsecureLocalHTTP)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .labelsHidden()
                 }
             }
         }
@@ -1603,10 +1799,8 @@ struct EndpointEditorView: View {
                     Text(saveMessage).foregroundStyle(.secondary)
                 } else if let validation = draft.validation().message {
                     Text(validation).foregroundStyle(.orange)
-                } else if !draft.isLoopbackEndpoint && draft.kind == .openAICompatible {
-                    Text("配置有效").foregroundStyle(.secondary)
                 } else {
-                    Text("")
+                    Text("配置有效").foregroundStyle(.secondary)
                 }
             }
             .font(.caption)

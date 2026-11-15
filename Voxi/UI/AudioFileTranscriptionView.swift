@@ -228,17 +228,43 @@ final class AudioFileTranscriptionModel: ObservableObject {
             throw TranscriptionError.invalidConfiguration(validation.message ?? "端点配置无效。")
         }
 
-        if profile.kind == .volcengineStreaming {
-            return try await transcribeWithVolcengine(result: result, profile: profile)
-        } else {
-            return try await transcribeWithOpenAI(result: result, profile: profile)
+        switch profile.kind {
+        case .volcengineStreaming:
+            return try await transcribeWithStreamingProvider(
+                VolcengineStreamingProvider(),
+                result: result,
+                profile: profile
+            )
+        case .aliyunBailianStreaming:
+            return try await transcribeWithStreamingProvider(
+                AliyunBailianProvider(),
+                result: result,
+                profile: profile
+            )
+        case .mimoASR:
+            return try await transcribeWithUploadProvider(
+                MiMOASRProvider(),
+                timeout: max(profile.mimo.timeoutSeconds, result.duration * 0.5 + 60),
+                result: result,
+                profile: profile
+            )
+        case .openAICompatible:
+            // 长音频的服务端处理时间可能超过端点默认超时，按音频时长放宽。
+            return try await transcribeWithUploadProvider(
+                OpenAICompatibleProvider(),
+                timeout: max(profile.openAI.timeoutSeconds, result.duration * 1.2 + 60),
+                result: result,
+                profile: profile
+            )
         }
     }
 
-    private func transcribeWithOpenAI(result: AudioFileConverter.Result, profile: EndpointProfile) async throws -> String {
-        let provider = OpenAICompatibleProvider()
-        // 长音频的服务端处理时间可能超过端点默认超时，按音频时长放宽。
-        let timeout = max(profile.openAI.timeoutSeconds, result.duration * 1.2 + 60)
+    private func transcribeWithUploadProvider(
+        _ provider: any TranscriptionProvider,
+        timeout: TimeInterval,
+        result: AudioFileConverter.Result,
+        profile: EndpointProfile
+    ) async throws -> String {
         let options = TranscriptionOptions(
             sessionID: UUID(),
             textMode: settings.settings.textMode,
@@ -260,8 +286,11 @@ final class AudioFileTranscriptionModel: ObservableObject {
         }
     }
 
-    private func transcribeWithVolcengine(result: AudioFileConverter.Result, profile: EndpointProfile) async throws -> String {
-        let provider = VolcengineStreamingProvider()
+    private func transcribeWithStreamingProvider(
+        _ provider: any TranscriptionProvider,
+        result: AudioFileConverter.Result,
+        profile: EndpointProfile
+    ) async throws -> String {
         let pcm = try AudioFileConverter.pcmFromWAV(result.url)
         let totalBytes = max(pcm.count, 1)
         var offset = 0

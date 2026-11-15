@@ -1,30 +1,23 @@
 import AppKit
 import Combine
-import SwiftUI
 
-/// 菜单栏图标与弹出面板。
+/// 菜单栏图标与原生下拉菜单。
 ///
-/// 不使用 SwiftUI `MenuBarExtra`（macOS 26/27 反复开合后可能失灵），
-/// 也不使用 `NSPopover`（其窗口阴影左右不对称，箭头与面板中心无法同时对齐）。
-/// 这里用无边框 `NSPanel`，内容严格以状态图标中心对齐。
+/// 采用 `NSMenu`（系统竖式列表）：状态行 + 转写音频 / 设置 / 检查更新 / 提供反馈 / 退出。
+/// 录音开始与结束仍由全局快捷键驱动，菜单只负责状态显示与命令入口。
 @MainActor
-final class StatusItemController: NSObject {
+final class StatusItemController: NSObject, NSMenuDelegate {
     private let statusItem: NSStatusItem
-    private let panel: NSPanel
-    private var hosting: NSHostingController<MenuBarView>!
+    private let menu = NSMenu()
     private var cancellables = Set<AnyCancellable>()
-    private var localMonitor: Any?
-    private var globalMonitor: Any?
-    private var pendingLayout: DispatchWorkItem?
-    private var previousApp: NSRunningApplication?
     private let coordinator: AppCoordinator
     private let settings: SettingsStore
     private let appState: AppState
+    /// 最近一个非 Voxi 的前台应用，用于把文件转写结果输入回去。
+    private var previousAppPID: pid_t?
+    private var pendingRecovery: AppError.Recovery?
 
-    /// 面板内容宽度（与 MenuBarView 的固定宽度一致）。
-    private static let contentWidth: CGFloat = 340
-    /// 面板与菜单栏之间的间距。
-    private static let topGap: CGFloat = 6
+    private static let feedbackURL = URL(string: "https://github.com/sseaan/Voxi/issues/new")!
 
     init(settings: SettingsStore, appState: AppState, coordinator: AppCoordinator) {
         self.coordinator = coordinator
@@ -32,53 +25,15 @@ final class StatusItemController: NSObject {
         self.appState = appState
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
 
-        let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth, height: 220),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
-        )
-        self.panel = panel
-
         super.init()
 
-        let root = MenuBarView(
-            settings: settings,
-            appState: appState,
-            coordinator: coordinator,
-            onRequestClose: { [weak panel] in
-                panel?.orderOut(nil)
-            },
-            onStartRecording: { [weak self] in
-                self?.startRecordingFromPanel()
-            },
-            onStopRecording: { [weak self] in
-                self?.stopRecordingFromPanel()
-            },
-            onTranscribeAudio: { [weak self] in
-                self?.openAudioFileTranscription()
-            }
-        )
-        hosting = NSHostingController(rootView: root)
-        hosting.sizingOptions = []
-        panel.contentViewController = hosting
-        panel.isOpaque = false
-        panel.backgroundColor = .clear
-        panel.hasShadow = true
-        panel.level = .popUpMenu
-        panel.hidesOnDeactivate = false
-        panel.isMovable = false
-        panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        panel.animationBehavior = .utilityWindow
-        panel.becomesKeyOnlyIfNeeded = false
-
         if let button = statusItem.button {
-            button.target = self
-            button.action = #selector(togglePanel)
             button.imagePosition = .imageOnly
             button.setAccessibilityLabel("Voxi")
         }
+        menu.delegate = self
+        menu.autoenablesItems = false
+        statusItem.menu = menu
 
         appState.$state
             .sink { [weak self] state in
@@ -86,139 +41,163 @@ final class StatusItemController: NSObject {
             }
             .store(in: &cancellables)
 
-        // 内容高度随状态（错误、结果、临时文本）变化，变化后重新布局。
-        appState.objectWillChange
-            .debounce(for: .milliseconds(30), scheduler: RunLoop.main)
-            .sink { [weak self] _ in
-                self?.scheduleLayout()
-            }
-            .store(in: &cancellables)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleAppActivation(_:)),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
 
         updateIcon(for: appState.state)
-        installEventMonitors()
-
-        DispatchQueue.main.async { [weak self] in
-            self?.logGeometry(event: "launch")
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
-            self?.logGeometry(event: "launch+2s")
-        }
     }
 
-    // MARK: - 显示 / 隐藏
+    @objc private func handleAppActivation(_ notification: Notification) {
+        guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            return
+        }
+        guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+        previousAppPID = app.processIdentifier
+    }
 
-    @objc private func togglePanel() {
-        if panel.isVisible {
-            hidePanel()
+    // MARK: - NSMenuDelegate
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        rebuildMenu()
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        rebuildMenu()
+    }
+
+    // MARK: - 菜单构建
+
+    private func rebuildMenu() {
+        menu.removeAllItems()
+        pendingRecovery = appState.error?.recovery
+
+        menu.addItem(statusItemForCurrentState())
+        menu.addItem(subtitleItem())
+        if let notice = appState.noticeMessage, !notice.isEmpty {
+            menu.addItem(hintItem(notice))
+        }
+        if let error = appState.error {
+            menu.addItem(hintItem("⚠︎ \(error.message)"))
+            if let recovery = error.recovery {
+                let title = MenuBarLabels.recoveryTitle(recovery)
+                menu.addItem(actionItem(title, action: #selector(performRecovery)))
+            }
+        }
+        if appState.lastResult != nil {
+            menu.addItem(actionItem("复制识别结果", action: #selector(copyLastResult)))
+        }
+
+        menu.addItem(.separator())
+        menu.addItem(actionItem("转写音频…", action: #selector(transcribeAudioFile)))
+        let settingsItem = actionItem("设置…", action: #selector(openSettings), key: ",")
+        menu.addItem(settingsItem)
+        menu.addItem(actionItem("检查更新…", action: #selector(checkForUpdates)))
+        menu.addItem(actionItem("提供反馈…", action: #selector(openFeedback)))
+        menu.addItem(.separator())
+        menu.addItem(actionItem("退出 Voxi", action: #selector(quit), key: "q"))
+    }
+
+    private func statusItemForCurrentState() -> NSMenuItem {
+        let title: String
+        if appState.state.isRecording, let startedAt = appState.recordingStartedAt {
+            title = "\(appState.state.menuTitle) · \(MenuBarLabels.formatted(elapsed: Date().timeIntervalSince(startedAt)))"
         } else {
-            showPanel()
+            title = appState.state.menuTitle
         }
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        item.image = stateImage()
+        item.image?.isTemplate = true
+        item.isEnabled = false
+        return item
     }
 
-    private func showPanel() {
-        if let front = NSWorkspace.shared.frontmostApplication,
-           front.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-            previousApp = front
+    private func subtitleItem() -> NSMenuItem {
+        let text: String
+        if appState.state.isRecording {
+            text = "松开或按快捷键结束录音"
+        } else if appState.state.isBusy {
+            text = "正在处理，请稍候…"
+        } else if let first = settings.settings.asrCandidates.first {
+            let count = settings.settings.asrCandidates.count
+            text = count > 1
+                ? "\(first.model) · 自动回退 \(count) 个模型"
+                : "\(first.sourceName) · \(first.model)"
+        } else {
+            text = "尚未配置识别端点"
         }
-        layoutPanel(keepTop: false)
-        NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
-        logGeometry(event: "show")
+        return hintItem(text)
     }
 
-    /// 从菜单栏开始录音：先收起面板并把前台还给原应用，避免结果粘回 Voxi。
-    private func startRecordingFromPanel() {
-        hidePanel()
-        if let previousApp {
-            previousApp.activate(options: [.activateIgnoringOtherApps])
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            self?.coordinator.startRecording()
-        }
+    private func hintItem(_ text: String) -> NSMenuItem {
+        let item = NSMenuItem(title: text, action: nil, keyEquivalent: "")
+        item.isEnabled = false
+        item.attributedTitle = NSAttributedString(
+            string: text,
+            attributes: [.font: NSFont.systemFont(ofSize: 11)]
+        )
+        return item
     }
 
-    private func openAudioFileTranscription() {
-        let targetPID = previousApp?.processIdentifier
-        hidePanel()
+    private func actionItem(_ title: String, action: Selector, key: String = "") -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
+        item.target = self
+        return item
+    }
+
+    private func stateImage() -> NSImage? {
+        let image = NSImage(
+            systemSymbolName: appState.state.menuBarSystemImage,
+            accessibilityDescription: appState.state.menuTitle
+        )
+        if appState.state.isRecording {
+            image?.isTemplate = false
+        }
+        return image
+    }
+
+    // MARK: - 动作
+
+    @objc private func performRecovery() {
+        guard let recovery = pendingRecovery else { return }
+        MenuBarLabels.perform(recovery)
+    }
+
+    @objc private func copyLastResult() {
+        guard let text = appState.lastResult?.text else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
+    @objc private func transcribeAudioFile() {
         AudioFileTranscriptionWindowController.shared.show(
             settings: settings,
-            targetPID: targetPID
+            targetPID: previousAppPID
         )
     }
 
-    private func stopRecordingFromPanel() {
-        if let previousApp {
-            previousApp.activate(options: [.activateIgnoringOtherApps])
-        }
-        coordinator.stopRecording()
-    }
-
-    func hidePanel() {
-        guard panel.isVisible else { return }
-        panel.orderOut(nil)
-    }
-
-    // MARK: - 布局
-
-    private func scheduleLayout() {
-        pendingLayout?.cancel()
-        let work = DispatchWorkItem { [weak self] in
-            guard let self, self.panel.isVisible else { return }
-            self.layoutPanel(keepTop: true)
-        }
-        pendingLayout = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
-    }
-
-    private func layoutPanel(keepTop: Bool) {
-        guard let button = statusItem.button, let window = button.window else { return }
-        let anchor = window.convertToScreen(button.convert(button.bounds, to: nil))
-
-        hosting.sizingOptions = .preferredContentSize
-        let ideal = hosting.sizeThatFits(in: NSSize(width: Self.contentWidth, height: 2_000))
-        let fitting = hosting.view.fittingSize
-        let preferred = hosting.preferredContentSize
-        Logger.app.debug(
-            "面板测量 preferred=\(preferred.width, privacy: .public)x\(preferred.height, privacy: .public) fitting=\(fitting.width, privacy: .public)x\(fitting.height, privacy: .public) sizeThatFits=\(ideal.width, privacy: .public)x\(ideal.height, privacy: .public) view=\(self.hosting.view.frame.width, privacy: .public)x\(self.hosting.view.frame.height, privacy: .public)"
+    @objc private func openSettings() {
+        SettingsWindowController.shared.show(
+            settings: settings,
+            appState: appState,
+            coordinator: coordinator
         )
-        let height = max(120, max(ideal.height, max(fitting.height, preferred.height)).rounded(.up) + 2)
-        let width = Self.contentWidth
-
-        let screen = window.screen ?? NSScreen.main
-        let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        var x = anchor.midX - width / 2
-        x = min(max(x, visible.minX + 8), visible.maxX - width - 8)
-        let top = keepTop ? panel.frame.maxY : anchor.minY - Self.topGap
-        let origin = NSPoint(x: x, y: top - height)
-        panel.setFrame(NSRect(x: origin.x, y: origin.y, width: width, height: height), display: true)
     }
 
-    // MARK: - 事件
+    @objc private func checkForUpdates() {
+        Task { await UpdateController.shared.checkForUpdates() }
+    }
 
-    private func installEventMonitors() {
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak self] event in
-            guard let self, self.panel.isVisible else { return event }
-            if event.type == .keyDown, event.keyCode == 53 { // Esc
-                self.hidePanel()
-                return nil
-            }
-            if event.type == .leftMouseDown {
-                let location = NSEvent.mouseLocation
-                if !self.panel.frame.contains(location) {
-                    self.hidePanel()
-                }
-            }
-            return event
-        }
+    @objc private func openFeedback() {
+        NSWorkspace.shared.open(Self.feedbackURL)
+    }
 
-        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.panel.isVisible else { return }
-                if !self.panel.frame.contains(NSEvent.mouseLocation) {
-                    self.hidePanel()
-                }
-            }
-        }
+    @objc private func quit() {
+        NSApp.terminate(nil)
     }
 
     // MARK: - 图标
@@ -234,12 +213,34 @@ final class StatusItemController: NSObject {
         button.contentTintColor = state == .recording ? .systemRed : nil
         button.setAccessibilityLabel("Voxi：\(state.menuTitle)")
     }
+}
 
-    private func logGeometry(event: String) {
-        guard let button = statusItem.button, let window = button.window else { return }
-        let rect = window.convertToScreen(button.convert(button.bounds, to: nil))
-        Logger.app.debug(
-            "菜单栏几何 [\(event, privacy: .public)] icon=\(rect.origin.x, privacy: .public),\(rect.origin.y, privacy: .public),\(rect.width, privacy: .public),\(rect.height, privacy: .public) panel=\(self.panel.frame.origin.x, privacy: .public),\(self.panel.frame.origin.y, privacy: .public),\(self.panel.frame.width, privacy: .public),\(self.panel.frame.height, privacy: .public)"
-        )
+/// 菜单文字与错误恢复动作（原自绘面板的纯函数，保留以便测试与复用）。
+enum MenuBarLabels {
+    static func formatted(elapsed: TimeInterval) -> String {
+        let total = max(0, Int(elapsed.rounded(.down)))
+        return String(format: "%d:%02d", total / 60, total % 60)
+    }
+
+    static func recoveryTitle(_ recovery: AppError.Recovery) -> String {
+        switch recovery {
+        case .openMicrophoneSettings: return "打开麦克风设置…"
+        case .openAccessibilitySettings: return "打开辅助功能设置…"
+        case .copyTranscript(let text): return text.isEmpty ? "复制" : "复制识别结果"
+        }
+    }
+
+    @MainActor
+    static func perform(_ recovery: AppError.Recovery) {
+        switch recovery {
+        case .openMicrophoneSettings:
+            PermissionService.openSettingsPane(.microphone)
+        case .openAccessibilitySettings:
+            PermissionService.openSettingsPane(.accessibility)
+        case .copyTranscript(let text):
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(text, forType: .string)
+        }
     }
 }

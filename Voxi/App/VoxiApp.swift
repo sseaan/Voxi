@@ -25,7 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let settings = SettingsStore()
         let state = AppState()
-        let coordinator = AppCoordinator(settings: settings, appState: state)
+        let coordinator = AppCoordinator(
+            settings: settings,
+            appState: state,
+            history: HistoryStore.shared
+        )
         self.settingsStore = settings
         self.appState = state
         self.coordinator = coordinator

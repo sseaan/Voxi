@@ -8,6 +8,8 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
     enum ProviderKind: String, Codable, CaseIterable, Identifiable {
         case openAICompatible
         case volcengineStreaming
+        case aliyunBailianStreaming
+        case mimoASR
 
         var id: String { rawValue }
 
@@ -15,6 +17,8 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
             switch self {
             case .openAICompatible: return "OpenAI-compatible 转写"
             case .volcengineStreaming: return "火山引擎豆包流式识别"
+            case .aliyunBailianStreaming: return "阿里云百炼实时识别"
+            case .mimoASR: return "小米 MiMo 语音识别"
             }
         }
 
@@ -24,6 +28,38 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
                 return "录音结束后整段上传到你的 HTTP 端点（multipart）。"
             case .volcengineStreaming:
                 return "录音过程中通过 WebSocket 实时发送音频分片，停止后等待最终结果。"
+            case .aliyunBailianStreaming:
+                return "阿里云百炼 Paraformer：WebSocket 实时发送 PCM，run-task / finish-task 事件协议。"
+            case .mimoASR:
+                return "小米 MiMo：录音结束后把整段 WAV 以 base64 发送到 /chat/completions。"
+            }
+        }
+
+        /// 卡片 / 列表里的短名称（`displayName` 较长，适合完整描述）。
+        var shortName: String {
+            switch self {
+            case .openAICompatible: return "OpenAI-compatible"
+            case .volcengineStreaming: return "火山引擎豆包"
+            case .aliyunBailianStreaming: return "阿里云百炼"
+            case .mimoASR: return "小米 MiMo"
+            }
+        }
+
+        /// Assets.xcassets 中的渠道图标；`nil` 表示使用通用图标。
+        var assetName: String? {
+            switch self {
+            case .openAICompatible: return nil
+            case .volcengineStreaming: return "ChannelVolcengine"
+            case .aliyunBailianStreaming: return "ChannelAliyunBailian"
+            case .mimoASR: return "ChannelMiMo"
+            }
+        }
+
+        /// 是否需要在录音过程中持续发送 PCM（流式协议）。
+        var requiresStreamedAudio: Bool {
+            switch self {
+            case .volcengineStreaming, .aliyunBailianStreaming: return true
+            case .openAICompatible, .mimoASR: return false
             }
         }
     }
@@ -109,7 +145,7 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         var sendsPromptField: Bool = true
         var customHeaders: [HTTPField] = []
         var customFormFields: [HTTPField] = []
-        /// 仅对 loopback 地址生效：允许明文 HTTP。
+        /// 仅对本机 / 局域网（含 EasyTier 等私有网段）生效：允许明文 HTTP。
         var allowsInsecureLocalHTTP: Bool = false
         /// 从 /models 获取并勾选的多模型列表；nil 表示使用单个 `model`。
         var enabledModels: [String]? = nil
@@ -153,6 +189,37 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         var sendsApiSequenceHeader: Bool = false
     }
 
+    /// 阿里云百炼 Paraformer 实时语音识别（DashScope WebSocket）。
+    struct AliyunOptions: Codable, Equatable {
+        var model: String = "paraformer-realtime-v2"
+        /// 逗号分隔的 `zh,en`；留空由模型自动判断。
+        var languageHints: String = ""
+        var semanticPunctuation: Bool = false
+        var maxSentenceSilence: Int = 1_300
+        var punctuationPrediction: Bool = true
+        var disfluencyRemoval: Bool = false
+        /// 可选热词表 ID（控制台创建）。
+        var vocabularyID: String = ""
+        var timeoutSeconds: Double = 60
+
+        var languageHintList: [String] {
+            languageHints
+                .split(whereSeparator: { $0 == "," || $0 == "，" || $0 == " " })
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        }
+    }
+
+    /// 小米 MiMo 语音识别：OpenAI 兼容 `/chat/completions` + base64 `input_audio`。
+    struct MiMOOptions: Codable, Equatable {
+        var model: String = "mimo-v2.5-asr"
+        var timeoutSeconds: Double = 120
+        /// 单次请求 base64 音频上限（文档：10MB）。
+        var maxAudioBytes: Int = 9_500_000
+        /// 仅对本机 / 局域网生效：允许明文 HTTP。
+        var allowsInsecureLocalHTTP: Bool = false
+    }
+
     var id: UUID
     var name: String
     var kind: ProviderKind
@@ -160,7 +227,9 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
     var endpointURL: String
     var openAI: OpenAIOptions
     var volcengine: VolcengineOptions
-    /// Keychain 中 API Key 的 item ID（OpenAI key / 火山 API Key）。
+    var aliyun: AliyunOptions
+    var mimo: MiMOOptions
+    /// Keychain 中 API Key 的 item ID（OpenAI key / 火山 API Key / 百炼 / MiMo）。
     var apiKeyItemID: UUID?
     /// 旧版火山控制台凭据的 Keychain item ID。
     var appKeyItemID: UUID?
@@ -173,6 +242,8 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         endpointURL: String,
         openAI: OpenAIOptions = OpenAIOptions(),
         volcengine: VolcengineOptions = VolcengineOptions(),
+        aliyun: AliyunOptions = AliyunOptions(),
+        mimo: MiMOOptions = MiMOOptions(),
         apiKeyItemID: UUID? = nil,
         appKeyItemID: UUID? = nil,
         accessKeyItemID: UUID? = nil
@@ -183,9 +254,32 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         self.endpointURL = endpointURL
         self.openAI = openAI
         self.volcengine = volcengine
+        self.aliyun = aliyun
+        self.mimo = mimo
         self.apiKeyItemID = apiKeyItemID
         self.appKeyItemID = appKeyItemID
         self.accessKeyItemID = accessKeyItemID
+    }
+
+    /// 旧配置缺少新字段时使用默认值，避免整份设置反序列化失败。
+    private enum CodingKeys: String, CodingKey {
+        case id, name, kind, endpointURL, openAI, volcengine, aliyun, mimo,
+             apiKeyItemID, appKeyItemID, accessKeyItemID
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? "未命名端点"
+        kind = try container.decodeIfPresent(ProviderKind.self, forKey: .kind) ?? .openAICompatible
+        endpointURL = try container.decodeIfPresent(String.self, forKey: .endpointURL) ?? ""
+        openAI = try container.decodeIfPresent(OpenAIOptions.self, forKey: .openAI) ?? OpenAIOptions()
+        volcengine = try container.decodeIfPresent(VolcengineOptions.self, forKey: .volcengine) ?? VolcengineOptions()
+        aliyun = try container.decodeIfPresent(AliyunOptions.self, forKey: .aliyun) ?? AliyunOptions()
+        mimo = try container.decodeIfPresent(MiMOOptions.self, forKey: .mimo) ?? MiMOOptions()
+        apiKeyItemID = try container.decodeIfPresent(UUID.self, forKey: .apiKeyItemID)
+        appKeyItemID = try container.decodeIfPresent(UUID.self, forKey: .appKeyItemID)
+        accessKeyItemID = try container.decodeIfPresent(UUID.self, forKey: .accessKeyItemID)
     }
 
     // MARK: - 默认配置
@@ -209,6 +303,22 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         )
     }
 
+    static func defaultAliyunProfile() -> EndpointProfile {
+        EndpointProfile(
+            name: "阿里云百炼",
+            kind: .aliyunBailianStreaming,
+            endpointURL: "wss://dashscope.aliyuncs.com/api-ws/v1/inference"
+        )
+    }
+
+    static func defaultMiMOProfile() -> EndpointProfile {
+        EndpointProfile(
+            name: "小米 MiMo",
+            kind: .mimoASR,
+            endpointURL: "https://api.xiaomimimo.com/v1/chat/completions"
+        )
+    }
+
     // MARK: - 校验
 
     /// Voxi 统一写入的 multipart 字段，自定义字段不得重复。
@@ -216,11 +326,16 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         "file", "model", "language", "prompt", "response_format", "boundary"
     ]
 
-    /// 端点是否指向本机 loopback。
+    /// 端点是否指向本机 loopback。火山引擎 `ws://` 只对这一类地址放开。
     var isLoopbackEndpoint: Bool {
-        guard let host = URLComponents(string: endpointURL)?.host?.lowercased() else { return false }
-        return host == "localhost" || host == "127.0.0.1" || host == "::1"
-            || host.hasSuffix(".localhost")
+        guard let host = URLComponents(string: endpointURL)?.host else { return false }
+        return LocalHostPolicy.isLoopback(host: host)
+    }
+
+    /// 端点是否指向本机 / 局域网 / EasyTier 等私有网络；只有这类地址才允许明文 HTTP。
+    var isLocalNetworkEndpoint: Bool {
+        guard let host = URLComponents(string: endpointURL)?.host else { return false }
+        return LocalHostPolicy.isLocalOrPrivate(host: host)
     }
 
     /// 读取某个 secret 引用的类型（不读取真实值）。
@@ -246,7 +361,8 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
         switch kind {
         case .openAICompatible:
             if scheme == "http" {
-                if !isLoopbackEndpoint || !openAI.allowsInsecureLocalHTTP {
+                // 明文 HTTP 只对不经过公网的地址放开，且必须由用户显式开启。
+                if !isLocalNetworkEndpoint || !openAI.allowsInsecureLocalHTTP {
                     errors.append(.insecureRemoteURL)
                 }
             } else if scheme != "https" {
@@ -311,6 +427,44 @@ struct EndpointProfile: Identifiable, Codable, Equatable {
                 if appKeyItemID == nil || accessKeyItemID == nil { errors.append(.missingLegacyCredentials) }
                 if apiKeyItemID != nil { errors.append(.mixedCredentialModes) }
             }
+
+        case .aliyunBailianStreaming:
+            if scheme != "wss" && scheme != "ws" {
+                errors.append(.unsupportedScheme(scheme))
+            }
+            if scheme == "ws" && !isLoopbackEndpoint {
+                errors.append(.insecureRemoteURL)
+            }
+            if aliyun.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors.append(.missingModel)
+            }
+            if apiKeyItemID == nil {
+                errors.append(.missingAPIKey)
+            }
+            if aliyun.timeoutSeconds <= 0 {
+                errors.append(.invalidTimeout)
+            }
+            if !(200...6_000).contains(aliyun.maxSentenceSilence) {
+                errors.append(.invalidConfiguration("VAD 静音阈值需在 200–6000 毫秒之间。"))
+            }
+
+        case .mimoASR:
+            if scheme == "http" {
+                if !isLocalNetworkEndpoint || !mimo.allowsInsecureLocalHTTP {
+                    errors.append(.insecureRemoteURL)
+                }
+            } else if scheme != "https" {
+                errors.append(.unsupportedScheme(scheme))
+            }
+            if mimo.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                errors.append(.missingModel)
+            }
+            if apiKeyItemID == nil {
+                errors.append(.missingAPIKey)
+            }
+            if mimo.timeoutSeconds <= 0 {
+                errors.append(.invalidTimeout)
+            }
         }
 
         return .init(errors: errors)
@@ -337,15 +491,16 @@ enum EndpointValidationError: Error, Equatable, LocalizedError {
     case missingResourceID
     case missingLegacyCredentials
     case mixedCredentialModes
+    case invalidConfiguration(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidURL:
             return "端点 URL 无效，请填写完整地址（含 https:// 或 wss://）。"
         case let .unsupportedScheme(scheme):
-            return "不支持的 URL scheme：\(scheme)。请使用 https 或 wss。"
+            return "不支持的 URL scheme：\(scheme)。请使用 https / wss（本机或局域网地址可改用 http 并打开开关）。"
         case .insecureRemoteURL:
-            return "远程端点必须使用 HTTPS/WSS；只有本机 loopback 地址才可以在明确允许时使用 HTTP。"
+            return "远程端点必须使用 HTTPS/WSS；本机或局域网（含 EasyTier 私有网段）用 HTTP 时，需在本页打开「允许明文 HTTP」。"
         case .missingModel:
             return "请填写 model。"
         case .missingAPIKey:
@@ -366,6 +521,8 @@ enum EndpointValidationError: Error, Equatable, LocalizedError {
             return "旧版控制台鉴权需要同时填写 App Key 与 Access Key。"
         case .mixedCredentialModes:
             return "API Key 与旧版 App Key/Access Key 不能混用，请只保留一种认证模式。"
+        case let .invalidConfiguration(message):
+            return message
         }
     }
 }

@@ -52,6 +52,7 @@ enum TranscriptionError: Error, LocalizedError, Equatable {
     case network(String)
     case invalidResponse(String)
     case emptyTranscript
+    case remoteError(String)
     case unexpectedContentType(String?)
     case audioFileUnreadable
 
@@ -84,6 +85,8 @@ enum TranscriptionError: Error, LocalizedError, Equatable {
             return "无法解析识别服务的响应：\(message)"
         case .emptyTranscript:
             return "识别结果为空，没有可输入的文字。"
+        case .remoteError(let message):
+            return "识别服务返回错误：\(message)"
         case let .unexpectedContentType(contentType):
             return "响应格式不符合预期（Content-Type: \(contentType ?? "未知")）。"
         case .audioFileUnreadable:

@@ -23,6 +23,8 @@ final class AppCoordinator: ObservableObject {
     private let frontmostProvider: FrontmostAppProviding
     private let styleProcessor: (String, VoxiSettings) async throws -> String
     private let shortcutService = ShortcutService()
+    /// 识别历史；nil 表示不记录（测试默认）。
+    let history: HistoryStore?
 
     private var permissionTask: Task<Void, Never>?
     private var audioTask: Task<Void, Never>?
@@ -50,6 +52,8 @@ final class AppCoordinator: ObservableObject {
     private var sessionModels: [ASRModelCandidate] = []
     private var attemptedModelIDs: Set<String> = []
     private var activeSessionModel: ASRModelCandidate?
+    /// 最近一次成功产出结果的模型，用于历史记录。
+    private var lastUsedCandidate: ASRModelCandidate?
     /// 流式模型中途断开：继续录音，结束后用备用模型转写。
     private var streamingFailed = false
 
@@ -63,7 +67,8 @@ final class AppCoordinator: ObservableObject {
         frontmostProvider: FrontmostAppProviding = SystemFrontmostApp(),
         styleProcessor: @escaping (String, VoxiSettings) async throws -> String = { text, settings in
             try await StyleProcessor.process(text: text, settings: settings)
-        }
+        },
+        history: HistoryStore? = nil
     ) {
         self.settings = settings
         self.appState = appState
@@ -71,11 +76,17 @@ final class AppCoordinator: ObservableObject {
         self.audioCapture = audioCapture
         self.permissions = PermissionService()
 
-        let resolvedProviders = providers ?? [OpenAICompatibleProvider(), VolcengineStreamingProvider()]
+        let resolvedProviders = providers ?? [
+            OpenAICompatibleProvider(),
+            VolcengineStreamingProvider(),
+            AliyunBailianProvider(),
+            MiMOASRProvider()
+        ]
         self.providers = Dictionary(uniqueKeysWithValues: resolvedProviders.map { ($0.kind, $0) })
         self.textInserter = textInserter ?? TextInsertionService(frontmost: frontmostProvider)
         self.frontmostProvider = frontmostProvider
         self.styleProcessor = styleProcessor
+        self.history = history
     }
 
     /// 应用启动时调用一次：注册全局快捷键并跟随设置变化。
@@ -213,6 +224,7 @@ final class AppCoordinator: ObservableObject {
         sessionModels = candidates
         attemptedModelIDs = []
         activeSessionModel = nil
+        lastUsedCandidate = nil
         streamingFailed = false
 
         if appState.state == .failed {
@@ -420,6 +432,7 @@ final class AppCoordinator: ObservableObject {
     private func startAudioCapture(sessionID: UUID) async throws {
         // AVAudioEngine 的启动/停止不能在主线程执行：设备切换时 CoreAudio 可能阻塞数秒。
         let capture = audioCapture
+        capture.inputDeviceUID = settings.settings.microphoneUID
         let stream = try await Self.runWithTimeout(seconds: 10) {
             try capture.start()
         }
@@ -550,11 +563,23 @@ final class AppCoordinator: ObservableObject {
                 }
             }
             if !finalText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                // 只记录计数与时长，不保存转写文本。
                 settings.settings.usage.record(
                     duration: metadata.duration,
                     text: finalText
                 )
+                if settings.settings.history.enabled {
+                    history?.add(
+                        HistoryEntry(
+                            text: finalText,
+                            duration: metadata.duration,
+                            sourceName: lastUsedCandidate?.sourceName ?? "",
+                            model: lastUsedCandidate?.model ?? "",
+                            providerKind: result.providerKind.rawValue,
+                            styleName: style.requiresLLM ? style.name : nil
+                        ),
+                        maxEntries: settings.settings.history.maxEntries
+                    )
+                }
             }
 
             var storedResult = result
@@ -624,6 +649,7 @@ final class AppCoordinator: ObservableObject {
             do {
                 let result = try await session.finish(recordingURL: wavURL)
                 if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    lastUsedCandidate = candidate
                     return result
                 }
                 attempts.append("\(displayName(candidate))：返回空结果")
@@ -650,6 +676,7 @@ final class AppCoordinator: ObservableObject {
                 )
                 if !result.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Logger.app.info("备用模型「\(candidate.sourceName) · \(candidate.model, privacy: .public)」转写成功")
+                    lastUsedCandidate = candidate
                     return result
                 }
                 attempts.append("\(displayName(candidate))：返回空结果")
@@ -683,7 +710,7 @@ final class AppCoordinator: ObservableObject {
         )
         let session = try await provider.makeSession(profile: profile, options: options)
 
-        if profile.kind == .volcengineStreaming {
+        if profile.kind.requiresStreamedAudio {
             let pcm = try AudioFileConverter.pcmFromWAV(wavURL)
             var offset = 0
             while offset < pcm.count {

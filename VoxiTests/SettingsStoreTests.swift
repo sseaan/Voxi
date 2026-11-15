@@ -163,6 +163,13 @@ final class TextModeTests: XCTestCase {
 }
 
 final class EndpointProfileValidationTests: XCTestCase {
+    func testProviderKindAssetNames() {
+        XCTAssertNil(EndpointProfile.ProviderKind.openAICompatible.assetName)
+        XCTAssertEqual(EndpointProfile.ProviderKind.volcengineStreaming.assetName, "ChannelVolcengine")
+        XCTAssertEqual(EndpointProfile.ProviderKind.aliyunBailianStreaming.assetName, "ChannelAliyunBailian")
+        XCTAssertEqual(EndpointProfile.ProviderKind.mimoASR.assetName, "ChannelMiMo")
+    }
+
     func testRemoteHTTPIsRejected() {
         var profile = EndpointProfile.defaultOpenAIProfile()
         profile.endpointURL = "http://example.com/v1/audio/transcriptions"
@@ -185,6 +192,60 @@ final class EndpointProfileValidationTests: XCTestCase {
         profile.endpointURL = "https://localhost:8443/v1/audio/transcriptions"
         profile.apiKeyItemID = UUID()
         XCTAssertTrue(profile.validation().isValid)
+    }
+
+    func testLocalNetworkHTTPRequiresExplicitOptIn() {
+        for url in [
+            "http://10.144.144.4:8080/v1/audio/transcriptions",   // EasyTier
+            "http://192.168.1.10:8080/v1/audio/transcriptions",
+            "http://172.16.0.5:8080/v1/audio/transcriptions",
+            "http://100.64.0.7:8080/v1/audio/transcriptions",
+            "http://169.254.10.2:8080/v1/audio/transcriptions",
+            "http://pi.local:8080/v1/audio/transcriptions",
+            "http://raspberrypi:8080/v1/audio/transcriptions",
+            "http://[fd00::1]:8080/v1/audio/transcriptions"
+        ] {
+            let rejected = endpointProfile(url)
+            XCTAssertTrue(rejected.validation().errors.contains(.insecureRemoteURL), url)
+
+            let allowed = endpointProfile(url, allowsInsecureLocalHTTP: true)
+            XCTAssertTrue(allowed.validation().isValid, url)
+        }
+    }
+
+    func testPublicHTTPIsRejectedEvenWhenOptedIn() {
+        for url in [
+            "http://8.8.8.8/v1/audio/transcriptions",
+            "http://example.com/v1/audio/transcriptions",
+            "http://172.32.0.1/v1/audio/transcriptions",
+            "http://100.128.0.1/v1/audio/transcriptions",
+            "http://[2001:4860:4860::8888]/v1/audio/transcriptions"
+        ] {
+            let profile = endpointProfile(url, allowsInsecureLocalHTTP: true)
+            XCTAssertTrue(profile.validation().errors.contains(.insecureRemoteURL), url)
+        }
+    }
+
+    func testLocalNetworkHTTPSNeedsNoOptIn() {
+        for url in [
+            "https://10.144.144.4:8080/v1/audio/transcriptions",
+            "https://192.168.1.10/v1/audio/transcriptions",
+            "https://pi.local/v1/audio/transcriptions"
+        ] {
+            XCTAssertTrue(endpointProfile(url).validation().isValid, url)
+        }
+    }
+
+    private func endpointProfile(
+        _ endpointURL: String,
+        allowsInsecureLocalHTTP: Bool = false
+    ) -> EndpointProfile {
+        var profile = EndpointProfile.defaultOpenAIProfile()
+        profile.endpointURL = endpointURL
+        profile.openAI.model = "sensevoice"
+        profile.apiKeyItemID = UUID()
+        profile.openAI.allowsInsecureLocalHTTP = allowsInsecureLocalHTTP
+        return profile
     }
 
     func testMissingModelAndKey() {

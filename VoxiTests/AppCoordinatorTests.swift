@@ -14,6 +14,7 @@ final class StubAudioCapture: AudioCapturing, @unchecked Sendable {
     private(set) var cancelCount = 0
     private(set) var lastFileURL: URL?
     var chunkCount = 1
+    var inputDeviceUID: String?
 
     init(behaviour: Behaviour = .success(duration: 1.2)) {
         self.behaviour = behaviour
@@ -172,7 +173,8 @@ final class AppCoordinatorTests: XCTestCase {
         audioCapture: StubAudioCapture = StubAudioCapture(),
         provider: FakeTranscriptionProvider? = nil,
         microphoneGate: MicrophoneAccessGating = StubMicrophoneGate(authorization: .granted, grants: true),
-        styleProcessor: @escaping (String, VoxiSettings) async throws -> String = { text, _ in text }
+        styleProcessor: @escaping (String, VoxiSettings) async throws -> String = { text, _ in text },
+        history: HistoryStore? = nil
     ) -> (AppCoordinator, SettingsStore, AppState, FakeTranscriptionProvider) {
         let provider = provider ?? FakeTranscriptionProvider()
         let suite = "test.\(UUID().uuidString)"
@@ -189,7 +191,8 @@ final class AppCoordinatorTests: XCTestCase {
             providers: [provider],
             textInserter: textInserter,
             frontmostProvider: frontmost,
-            styleProcessor: styleProcessor
+            styleProcessor: styleProcessor,
+            history: history
         )
         return (coordinator, store, state, provider)
     }
@@ -672,19 +675,54 @@ final class AppCoordinatorTests: XCTestCase {
         XCTAssertTrue(state.errorMessage?.contains("前台应用已切换") ?? false)
     }
 
+    func testRecordsHistoryWhenEnabled() async {
+        let history = HistoryStore(fileURL: nil)
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "历史文本"
+        let (coordinator, store, state, _) = makeCoordinator(provider: provider, history: history)
+        store.settings.autoInsertEnabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+
+        XCTAssertEqual(history.entries.count, 1)
+        XCTAssertEqual(history.entries.first?.text, "历史文本")
+        XCTAssertEqual(history.entries.first?.model, "whisper-1")
+        XCTAssertEqual(history.entries.first?.sourceName, "OpenAI-compatible")
+        XCTAssertFalse(history.entries.first?.providerKind.isEmpty ?? true)
+    }
+
+    func testSkipsHistoryWhenDisabled() async {
+        let history = HistoryStore(fileURL: nil)
+        let provider = FakeTranscriptionProvider()
+        provider.session.resultText = "不记录"
+        let (coordinator, store, state, _) = makeCoordinator(provider: provider, history: history)
+        store.settings.autoInsertEnabled = false
+        store.settings.history.enabled = false
+
+        coordinator.startRecording()
+        await waitFor { state.state == .recording }
+        coordinator.stopRecording()
+        await waitFor { state.state == .idle }
+
+        XCTAssertTrue(history.entries.isEmpty)
+    }
+
     func testMenuBarElapsedFormatting() {
-        XCTAssertEqual(MenuBarView.formatted(elapsed: 0), "0:00")
-        XCTAssertEqual(MenuBarView.formatted(elapsed: 65), "1:05")
-        XCTAssertEqual(MenuBarView.formatted(elapsed: -3), "0:00")
+        XCTAssertEqual(MenuBarLabels.formatted(elapsed: 0), "0:00")
+        XCTAssertEqual(MenuBarLabels.formatted(elapsed: 65), "1:05")
+        XCTAssertEqual(MenuBarLabels.formatted(elapsed: -3), "0:00")
     }
 
     func testErrorRecoveryTitles() {
         XCTAssertEqual(
-            MenuBarView.recoveryTitle(.openMicrophoneSettings),
+            MenuBarLabels.recoveryTitle(.openMicrophoneSettings),
             "打开麦克风设置…"
         )
         XCTAssertEqual(
-            MenuBarView.recoveryTitle(.copyTranscript("hi")),
+            MenuBarLabels.recoveryTitle(.copyTranscript("hi")),
             "复制识别结果"
         )
     }

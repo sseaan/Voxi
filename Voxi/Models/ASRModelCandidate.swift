@@ -1,6 +1,6 @@
 import Foundation
 
-/// 一个「来源 + 模型」组合。同一来源可以启用多个模型，按来源顺序、模型顺序回退。
+/// 一个「来源 + 模型」组合。回退顺序由模型页的扁平列表决定（`VoxiSettings.asrOrder`）。
 struct ASRModelCandidate: Identifiable, Equatable {
     let profile: EndpointProfile
     let model: String
@@ -23,6 +23,10 @@ extension EndpointProfile {
             copy.openAI.model = model
         case .volcengineStreaming:
             copy.volcengine.modelName = model
+        case .aliyunBailianStreaming:
+            copy.aliyun.model = model
+        case .mimoASR:
+            copy.mimo.model = model
         }
         return copy
     }
@@ -43,15 +47,39 @@ extension EndpointProfile {
         case .volcengineStreaming:
             let manual = volcengine.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
             return manual.isEmpty ? [] : [manual]
+        case .aliyunBailianStreaming:
+            let manual = aliyun.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            return manual.isEmpty ? [] : [manual]
+        case .mimoASR:
+            let manual = mimo.model.trimmingCharacters(in: .whitespacesAndNewlines)
+            return manual.isEmpty ? [] : [manual]
         }
     }
 }
 
 extension VoxiSettings {
-    /// 按来源顺序展开所有启用的语音识别模型。
+    /// 全部启用的语音识别模型。
+    ///
+    /// - 有显式 `asrOrder` 时按它排序（可跨来源）；
+    /// - 新增 / 未记录的模型排在末尾，旧配置（nil）按来源 × 模型推导。
     var asrCandidates: [ASRModelCandidate] {
-        profiles.flatMap { profile in
+        let derived = profiles.flatMap { profile in
             profile.effectiveModels.map { ASRModelCandidate(profile: profile, model: $0) }
         }
+        guard let asrOrder, !asrOrder.isEmpty else { return derived }
+
+        var byID: [String: ASRModelCandidate] = [:]
+        for candidate in derived { byID[candidate.id] = candidate }
+
+        var seen = Set<String>()
+        var ordered: [ASRModelCandidate] = []
+        for id in asrOrder {
+            guard let candidate = byID[id], seen.insert(id).inserted else { continue }
+            ordered.append(candidate)
+        }
+        for candidate in derived where !seen.contains(candidate.id) {
+            ordered.append(candidate)
+        }
+        return ordered
     }
 }

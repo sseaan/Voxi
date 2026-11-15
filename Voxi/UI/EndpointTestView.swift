@@ -68,6 +68,10 @@ final class EndpointTestModel: ObservableObject {
                 provider = OpenAICompatibleProvider()
             case .volcengineStreaming:
                 provider = VolcengineStreamingProvider()
+            case .aliyunBailianStreaming:
+                provider = AliyunBailianProvider()
+            case .mimoASR:
+                provider = MiMOASRProvider()
             }
             let session = try await provider.makeSession(
                 profile: profile,
@@ -87,7 +91,7 @@ final class EndpointTestModel: ObservableObject {
                 }
             }
 
-            if profile.kind == .volcengineStreaming {
+            if profile.kind.requiresStreamedAudio {
                 // 把测试录音按 200ms 分片模拟实时流，验证真实流式链路。
                 let pcm = try Self.pcmFromWAV(recordingURL)
                 var offset = 0

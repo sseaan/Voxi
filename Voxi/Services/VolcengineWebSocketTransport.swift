@@ -5,6 +5,8 @@ protocol VolcengineWebSocketTransport: AnyObject {
     /// 建立连接（URLRequest 中带鉴权 header）。
     func connect(request: URLRequest) async throws
     func send(_ data: Data) async throws
+    /// 发送文本帧（JSON 指令）。默认退回二进制，厂商实现可覆盖。
+    func sendText(_ text: String) async throws
     /// 返回下一帧二进制数据；`nil` 表示连接已正常关闭。
     func receive() async throws -> Data?
     func close()
@@ -38,6 +40,11 @@ final class URLSessionWebSocketTransport: VolcengineWebSocketTransport {
         try await task.send(.data(data))
     }
 
+    func sendText(_ text: String) async throws {
+        guard let task else { throw TranscriptionError.network("WebSocket 连接已关闭，请重试。") }
+        try await task.send(.string(text))
+    }
+
     func receive() async throws -> Data? {
         guard let task else { return nil }
         let message = try await task.receive()
@@ -54,5 +61,13 @@ final class URLSessionWebSocketTransport: VolcengineWebSocketTransport {
     func close() {
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
+    }
+}
+
+
+extension VolcengineWebSocketTransport {
+    /// 默认实现：按 UTF-8 二进制发送（fake transport 无需额外实现）。
+    func sendText(_ text: String) async throws {
+        try await send(Data(text.utf8))
     }
 }

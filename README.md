@@ -51,8 +51,8 @@
 <details open>
 <summary><strong>识别与回退</strong></summary>
 
-- **两种 ASR**：OpenAI-compatible `v1/audio/transcriptions`（整段上传）与火山引擎豆包双向流式 WebSocket。
-- **多来源、多模型**：一个来源可启用多个模型，按「来源顺序 × 模型顺序」自动回退；录音结束失败会用录制好的 WAV 重跑备用模型。
+- **四种 ASR**：OpenAI-compatible `v1/audio/transcriptions`（整段上传）、火山引擎豆包双向流式 WebSocket、阿里云百炼 Paraformer 实时 WebSocket、小米 MiMo `/chat/completions` + base64 音频。
+- **多来源、多模型**：模型页是一个扁平的语音识别模型列表，可跨来源调整回退顺序；录音结束失败会用录制好的 WAV 重跑备用模型。
 - **长录音/长文件**：火山单连接按 50 秒分段转写；8 秒超时误关连接的问题已修复。
 - **音频文件转写**：菜单栏「转写音频…」，支持 mp3 / m4a / wav / aiff 等，结果可复制、插入或导出 TXT。
 </details>
@@ -62,7 +62,7 @@
 
 - **四种内置风格**：原文 / 简单整理 / 清晰结构 / 正式表达；卡片内含效果示例。
 - **自定义提示词**：添加自己的整理指令，保存为卡片随时切换。
-- **语言模型**：通用 OpenAI Chat Completions，以及 OpenCode Go 专用端点适配。
+- **语言模型**：通用 OpenAI Chat Completions，以及 OpenCode Go 专用端点适配；内置 DeepSeek / MiniMax / 小米 MiMo 渠道预设与图标（只预填 Endpoint 与 model，仍可手动改）；四类 ASR 来源（OpenAI / 火山 / 百炼 / MiMo）也都有品牌图标。
 - **个人词库**：术语 + 常见误写；作为识别提示（OpenAI prompt / 火山热词），并在本地替换误写。
 - **Rime 词库**：只读扫描 `~/Library/Rime` 的用户词典与 `custom_phrase.txt`，把高频多字词（默认上屏 ≥ 8 次，可在页面调整）导入为识别热词；不修改 Rime 文件，也不参与本地替换。
 - **失败不丢文本**：语言模型不可用时自动使用原文，并明确提示。
@@ -71,18 +71,19 @@
 <details>
 <summary><strong>输入与系统集成</strong></summary>
 
-- 菜单栏常驻，无 Dock 图标；按住说话或按下开始/再次按下结束。
+- 菜单栏常驻，无 Dock 图标；原生竖式菜单显示状态，并提供转写音频、设置、检查更新、提供反馈、退出。
+- 按住说话或按下开始/再次按下结束；可在通用设置里选择录音麦克风。
 - Fn / 右 Option 单键，或任意组合键；新安装默认右 Option。
 - Dock 上方实时波形浮条；辅助功能写入光标，失败时回退剪贴板 + ⌘V 并恢复原剪贴板。
 - 首次打开四页引导：权限、Keychain、快捷键、模型（可跳过）、登录启动。
-- 登录时启动（SMAppService）、个人词库、看板统计。
+- 登录时启动（SMAppService）、个人词库、看板统计、本地识别历史（可搜索 / 复制 / 清空）。
 </details>
 
 ---
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/sseaan/Voxi/releases) 下载 `Voxi.zip`。
+从 [GitHub Releases](https://github.com/sseaan/Voxi/releases) 下载 `Voxi-<版本>.dmg`。
 
 | 项目 | 说明 |
 |---|---|
@@ -92,7 +93,7 @@
 
 首次启动可能被 Gatekeeper 拦截：
 
-1. 解压后把 `Voxi.app` 拖入「应用程序」。
+1. 打开 DMG，把 `Voxi.app` 拖入「应用程序」。
 2. 在 Finder 中右键 `Voxi.app` → **打开** → 再次确认。
 3. 如仍被拦截：系统设置 → 隐私与安全性 → 安全性 → **仍要打开**。
 4. 只有确认来源和 SHA-256 后，才可仅对这个 App 移除隔离标记：
@@ -101,7 +102,7 @@
 xattr -dr com.apple.quarantine /Applications/Voxi.app
 ```
 
-不要关闭整机 Gatekeeper。发布页的 `manifest.txt` 提供 zip 和二进制 SHA-256。
+不要关闭整机 Gatekeeper。发布页的 `manifest.txt` 提供 DMG 和二进制 SHA-256。
 
 ---
 
@@ -116,6 +117,7 @@ xattr -dr com.apple.quarantine /Applications/Voxi.app
 2. 打开 **设置 → 模型**：
    - 添加模型来源：OpenAI-compatible 或火山引擎；
    - 填 Endpoint、model、API Key；
+   - 端点在本机 / 局域网 / EasyTier 等私有网络时可用 `http://`（如 `http://10.144.144.4:8080/v1/audio/transcriptions`），保存前需打开「允许明文 HTTP」；公网地址仍要求 HTTPS；
    - 点「获取模型列表…」勾选多个模型，调整来源/模型顺序。
 3. 可选：在 **设置 → 模型** 添加语言模型（通用 OpenAI / OpenCode Go），再到 **风格** 选择整理方式。
 4. 可选：在 **设置 → 词库** 点「同步词条」，从 Rime 个人词库导入常用词作为识别提示。
@@ -155,7 +157,7 @@ xcodebuild test \
   -derivedDataPath build/DerivedData
 ```
 
-当前基线：226 项测试（223 项通过，3 项按环境跳过：真实服务与辅助功能）。
+当前基线：264 项测试（261 项通过，3 项按环境跳过：真实服务与辅助功能）。
 
 真实服务联调：
 
@@ -178,7 +180,7 @@ xcodebuild build \
 codesign --verify --deep --strict build/DerivedData-release/Build/Products/Release/Voxi.app
 ```
 
-GitHub Actions（`.github/workflows/release.yml`）在推送 `v*` tag 时构建 universal Release，使用 ad-hoc 签名，生成 zip/manifest 并上传 GitHub Release。CI 没有本地自签名证书，因此 CI 产物的 TCC 授权与本地发布包不同。
+GitHub Actions（`.github/workflows/release.yml`）在推送 `v*` tag 时构建 universal Release，使用 ad-hoc 签名，生成 DMG（内含首次启动说明与 `/Applications` 快捷方式）与 `manifest.txt` 并上传 GitHub Release；release 说明底部自动附上本次提交摘要。CI 没有本地自签名证书，因此 CI 产物的 TCC 授权与本地发布包不同。
 
 > `project.yml` 是工程唯一源文件；增删文件后重新执行 `xcodegen generate`，不要手改 `project.pbxproj`。
 
@@ -193,7 +195,7 @@ GitHub Actions（`.github/workflows/release.yml`）在推送 `v*` tag 时构建 
         │
   AudioCapture（AVAudioEngine → 16 kHz mono PCM16 + 临时 WAV）
         │
-  ASR provider（OpenAI-compatible 上传 / 火山 WebSocket 流式）
+  ASR provider（OpenAI-compatible 上传 / 火山、百炼 WebSocket 流式 / MiMo Chat）
         │
   个人词库替换 → 可选风格（语言模型）→ 标点/换行
         │
@@ -222,7 +224,8 @@ Voxi/
 
 - **密钥**：API Key、App/Access Key、secret header 只存 macOS Keychain；设置 JSON 只保存 item UUID。
 - **音频**：只在一次识别流程内存在，临时 WAV 流程结束后删除；`VOXI_KEEP_RECORDINGS=1` 仅用于诊断。
-- **看板**：只保存总时长、总字数、总次数和每日字数；不保存转写文本。
+- **看板**：只保存总时长、总字数、总次数和每日字数。
+- **历史记录**：识别文本保存在本机 `~/Library/Application Support/Voxi/history.json`，默认开启，可在 设置 → 历史记录 关闭、限制条数或清空。
 - **网络**：音频发给你配置的 ASR 端点；选择整理风格时，识别后的文本发给你配置的语言模型端点。
 - **无账号、无遥测、无 Voxi 托管服务**。
 
@@ -233,6 +236,7 @@ Voxi/
 ## 文档
 
 - [火山引擎 v3 协议夹具](docs/volcengine-protocol.md)
+- [更新方案评估（Sparkle vs 自研）](docs/sparkle-update-plan.md)
 - [实施与变更记录](docs/status.md)
 - [首次启动说明模板](packaging/README-FIRST-LAUNCH.txt)
 
@@ -240,6 +244,6 @@ Voxi/
 
 ## 版本与许可证
 
-当前版本 `1.0.1`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
+当前版本 `1.1.0`。版本说明见 [GitHub Releases](https://github.com/sseaan/Voxi/releases)。
 
 个人项目，仓库暂未附开源许可证。

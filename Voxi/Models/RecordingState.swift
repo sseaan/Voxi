@@ -2,7 +2,7 @@ import Foundation
 
 /// 一次录音流程的全局状态。由 `AppCoordinator` 独占修改。
 ///
-/// 合法流转（两种 provider 共用骨架，`connecting` 仅火山流式使用）：
+/// 合法流转（所有 provider 共用骨架，`connecting` 仅流式 provider 使用）：
 ///
 /// ```
 /// idle -> requestingPermission -> connecting? -> recording -> finalizingAudio
